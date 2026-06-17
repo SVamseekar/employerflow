@@ -16,9 +16,14 @@ FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import threading
     Base.metadata.create_all(bind=engine)
-    from app.startup import maybe_seed
-    maybe_seed()
+
+    def _seed():
+        from app.startup import maybe_seed
+        maybe_seed()
+
+    threading.Thread(target=_seed, daemon=True).start()
     yield
 
 
