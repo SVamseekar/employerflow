@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EmployerFlow App</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+<div id="auth-screen" class="auth-screen">
+  <div class="auth-card">
+    <h1>Employer<span style="color:var(--accent)">Flow</span></h1>
+    <p>Sign in to access your employer directory and shortlist.</p>
+    <div class="auth-tabs">
+      <button class="btn btn-ghost active" id="tab-login" onclick="showAuthTab('login')">Sign In</button>
+      <button class="btn btn-ghost" id="tab-register" onclick="showAuthTab('register')">Register</button>
+    </div>
+    <form id="auth-form" onsubmit="handleAuth(event)">
+      <div class="field" id="name-field" style="display:none">
+        <label>Full name</label>
+        <input type="text" id="full-name" placeholder="Your name">
+      </div>
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="email" required placeholder="you@email.com">
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="password" required minlength="8" placeholder="Min 8 characters">
+      </div>
+      <div class="error hidden" id="auth-error"></div>
+      <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px" id="auth-submit">Sign In</button>
+    </form>
+    <p style="margin-top:16px;text-align:center;font-size:13px"><a href="/">← Back to home</a></p>
+  </div>
+</div>
+
+<div id="app-shell" class="app-shell hidden">
+  <aside class="sidebar">
+    <div class="logo">Employer<span>Flow</span></div>
+    <button class="nav-item active" data-view="dashboard" onclick="switchView('dashboard')">Dashboard</button>
+    <button class="nav-item" data-view="directory" onclick="switchView('directory')">Employers</button>
+    <button class="nav-item" data-view="profile" onclick="switchView('profile')">Profile</button>
+    <button class="nav-item" data-view="shortlist" onclick="switchView('shortlist')">Shortlist</button>
+    <button class="nav-item" data-view="crm" onclick="switchView('crm')">CRM</button>
+    <button class="nav-item" data-view="billing" onclick="switchView('billing')">Billing</button>
+    <div class="sidebar-footer">
+      <div id="user-email" style="margin-bottom:6px"></div>
+      <span class="plan-pill" id="user-plan">free</span>
+      <button class="btn btn-ghost" style="width:100%;margin-top:12px;font-size:12px" onclick="logout()">Sign Out</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <section id="view-dashboard" class="view">
+      <div class="page-header"><h2>Dashboard</h2></div>
+      <div class="stats-grid" id="dash-stats"></div>
+      <div class="panel">
+        <h3>Quick start</h3>
+        <ol style="color:var(--muted);font-size:14px;padding-left:20px;line-height:2">
+          <li>Complete your <a href="#" onclick="switchView('profile');return false">profile</a> with skills and projects</li>
+          <li>Upgrade to <strong>Pro</strong> to unlock scoring and shortlist</li>
+          <li>Generate your personalized <a href="#" onclick="switchView('shortlist');return false">shortlist</a></li>
+          <li>Review and edit email drafts before outreach</li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="view-directory" class="view hidden">
+      <div class="page-header"><h2>Employer Directory</h2></div>
+      <div class="toolbar">
+        <input type="search" id="emp-search" placeholder="Search company, sector, tech..." style="min-width:220px" onkeyup="if(event.key==='Enter')loadEmployers()">
+        <select id="emp-region" onchange="loadEmployers()">
+          <option value="">All regions</option>
+          <option>Europe</option><option>USA</option><option>India</option>
+          <option>Australia/NZ</option><option>Remote/Global</option>
+        </select>
+        <select id="emp-visa" onchange="loadEmployers()">
+          <option value="">All visa</option>
+          <option value="confirmed">Visa confirmed</option>
+          <option value="possible">Visa possible</option>
+          <option value="remote">Remote only</option>
+        </select>
+        <button class="btn btn-primary" onclick="loadEmployers()">Search</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Company</th><th>Sector</th><th>Country</th><th>Visa</th><th>Score</th></tr></thead>
+          <tbody id="emp-tbody"></tbody>
+        </table>
+      </div>
+      <div class="toolbar" style="margin-top:12px">
+        <button class="btn btn-ghost" onclick="empPage--;loadEmployers()">← Prev</button>
+        <span id="emp-page-info" style="color:var(--muted);font-size:13px"></span>
+        <button class="btn btn-ghost" onclick="empPage++;loadEmployers()">Next →</button>
+      </div>
+    </section>
+
+    <section id="view-profile" class="view hidden">
+      <div class="page-header"><h2>Your Profile</h2><button class="btn btn-primary" onclick="saveProfile()">Save Profile</button></div>
+      <div class="panel">
+        <div class="form-grid">
+          <div><label>Headline</label><input id="p-headline" placeholder="AI/Data Engineer"></div>
+          <div><label>Location</label><input id="p-location" placeholder="Hyderabad, India"></div>
+          <div><label>Visa status</label><input id="p-visa" placeholder="EU Blue Card Eligible"></div>
+          <div><label>LinkedIn</label><input id="p-linkedin"></div>
+          <div><label>Certification</label><input id="p-cert"></div>
+          <div><label>Stack highlight (for emails)</label><input id="p-stack" placeholder="Python, Databricks, dbt, GCP..."></div>
+          <div class="full"><label>Summary</label><textarea id="p-summary" rows="3"></textarea></div>
+          <div class="full"><label>Skills (comma-separated)</label><textarea id="p-skills" rows="3" placeholder="Python, Databricks, dbt, GCP, FastAPI"></textarea></div>
+          <div class="full"><label>Role targets (comma-separated)</label><input id="p-roles" placeholder="Data Engineer, AI Engineer"></div>
+          <div class="full">
+            <label>Projects (JSON array — name, one_liner, themes[])</label>
+            <textarea id="p-projects" rows="6" placeholder='[{"name":"MyProject","one_liner":"Built X","themes":["fintech","data platform"]}]'></textarea>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-shortlist" class="view hidden">
+      <div class="page-header">
+        <h2>Shortlist & Outreach</h2>
+        <button class="btn btn-primary" onclick="generateShortlist()">Generate Shortlist</button>
+      </div>
+      <div id="shortlist-empty" class="panel hidden"><p style="color:var(--muted)">No shortlist yet. Complete your profile and click Generate.</p></div>
+      <div id="shortlist-detail" class="hidden">
+        <div class="panel">
+          <h3 id="sl-company"></h3>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:12px" id="sl-meta"></p>
+          <div class="form-grid">
+            <div><label>To email</label><input id="sl-to"></div>
+            <div><label>Job URL</label><input id="sl-job"></div>
+            <div class="full"><label>Email draft</label><textarea id="sl-draft" rows="14"></textarea></div>
+          </div>
+          <button class="btn btn-success" style="margin-top:12px" onclick="saveShortlistItem()">Save Draft</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Score</th><th>Company</th><th>Country</th><th>Notes</th><th></th></tr></thead>
+            <tbody id="sl-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-crm" class="view hidden">
+      <div class="page-header"><h2>Application CRM</h2></div>
+      <div class="panel" id="crm-locked">
+        <p style="color:var(--muted)">CRM requires Premium plan. <a href="#" onclick="switchView('billing');return false">Upgrade →</a></p>
+      </div>
+      <div id="crm-content" class="hidden">
+        <div class="panel">
+          <h3>Add application</h3>
+          <div class="form-grid">
+            <div><label>Company</label><input id="crm-company"></div>
+            <div><label>Role</label><input id="crm-role"></div>
+            <div><label>Status</label>
+              <select id="crm-status">
+                <option>Applied</option><option>Email Sent</option><option>Phone Screen</option>
+                <option>Interview</option><option>Offer</option><option>Rejected</option>
+              </select>
+            </div>
+            <div><label>Follow-up date</label><input type="date" id="crm-followup"></div>
+            <div class="full"><label>Notes</label><input id="crm-notes"></div>
+          </div>
+          <button class="btn btn-primary" style="margin-top:12px" onclick="addApplication()">Add</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Company</th><th>Role</th><th>Status</th><th>Follow-up</th><th>Notes</th></tr></thead>
+            <tbody id="crm-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-billing" class="view hidden">
+      <div class="page-header"><h2>Billing</h2></div>
+      <div class="pricing-grid" id="billing-plans"></div>
+      <div class="panel" style="margin-top:20px">
+        <button class="btn btn-ghost" onclick="openPortal()">Manage subscription (Stripe Portal)</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script src="/static/js/api.js"></script>
+<script src="/static/js/app.js"></script>
+</body>
+</html>

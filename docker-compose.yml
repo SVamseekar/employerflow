@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: employerflow
+      POSTGRES_PASSWORD: employerflow
+      POSTGRES_DB: employerflow
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U employerflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://employerflow:employerflow@db:5432/employerflow
+      EMPLOYER_CSV: /app/data/master_employers.csv
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./frontend/static:/app/frontend/static:ro
+    restart: unless-stopped
+
+volumes:
+  pgdata:

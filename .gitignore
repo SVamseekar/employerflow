@@ -1,0 +1,12 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+.DS_Store
+*.log
+pgdata/
+data/*.db
+data/*.sqlite
+# Keep bundled employer CSV for production seed
+!data/master_employers.csv
