@@ -12,6 +12,8 @@ from app.routers import applications, auth, billing, employers, shortlist
 
 settings = get_settings()
 FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "static"))
+ASSET_VERSION = os.environ.get("ASSET_VERSION", "95d9ee1")
+NO_CACHE = {"Cache-Control": "no-cache, no-store, must-revalidate"}
 
 
 @asynccontextmanager
@@ -57,12 +59,12 @@ def health():
 
 @app.get("/")
 def landing():
-    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
+    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"), headers=NO_CACHE)
 
 
 @app.get("/app.html")
 def app_page():
-    return FileResponse(os.path.join(FRONTEND_DIR, "app.html"))
+    return FileResponse(os.path.join(FRONTEND_DIR, "app.html"), headers=NO_CACHE)
 
 
 if os.path.isdir(FRONTEND_DIR):
