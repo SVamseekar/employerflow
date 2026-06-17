@@ -11,7 +11,7 @@ from app.database import Base, engine
 from app.routers import applications, auth, billing, employers, shortlist
 
 settings = get_settings()
-FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "static"))
+FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "static"))
 
 
 @asynccontextmanager
