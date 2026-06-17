@@ -1,49 +1,40 @@
-# EmployerFlow — Deployment Status
+# EmployerFlow — Deployment
 
-**Last deployed:** 2026-06-17
+## Recommended: 100% free stack
 
-## Production (Railway) — LIVE
+See **[FREE_STACK.md](FREE_STACK.md)** for the full guide.
 
-| Resource | URL |
-|----------|-----|
-| **App** | https://employerflow-api-production.up.railway.app |
-| **Landing** | https://employerflow-api-production.up.railway.app/ |
-| **Dashboard** | https://employerflow-api-production.up.railway.app/app.html |
-| **API Health** | https://employerflow-api-production.up.railway.app/api/health |
-| **GitHub** | https://github.com/SVamseekar/employerflow |
-| **Railway Dashboard** | https://railway.com/project/7bb7f581-02b0-4370-a933-d07c34117cbc |
+| Component | Provider | Cost |
+|-----------|----------|------|
+| API hosting | Render Free | $0 |
+| Database | Neon Free | $0 |
+| Code | GitHub | $0 |
 
-**Database:** Railway Postgres (auto-seeded with 14,674 employers on first boot)
+**Deploy in 2 clicks:** https://dashboard.render.com/select-repo?repo=https://github.com/SVamseekar/employerflow
 
-## Local (Docker Compose)
+---
+
+## Local (free)
 
 ```bash
 make up    # http://localhost:8000
 ```
 
-## Stripe (payments — not yet configured)
+---
 
-1. Run `bash scripts/setup_stripe.sh`
-2. Add keys to Railway: `railway variables --set STRIPE_SECRET_KEY=sk_...` etc.
-3. Webhook URL: `https://employerflow-api-production.up.railway.app/api/billing/webhook`
+## Legacy: Railway (NOT free — tear down)
 
-## Fly.io (blocked — needs billing)
+Railway was used during initial deploy. **Delete the project** to avoid charges:
 
-Fly login works (`martisoura@gmail.com`) but app creation requires a credit card:
-https://fly.io/dashboard/marti-soura-vamseekar/billing
+https://railway.com/project/7bb7f581-02b0-4370-a933-d07c34117cbc
 
-`fly.toml` is ready — deploy after adding payment method:
+Previous URL (will stop working after deletion):
+`https://employerflow-api-production.up.railway.app`
 
-```bash
-fly apps create employerflow
-fly postgres create --name employerflow-db --region fra
-fly postgres attach employerflow-db -a employerflow
-fly secrets set SECRET_KEY=... APP_URL=https://employerflow.fly.dev -a employerflow
-fly deploy
-```
+---
 
-## Render (alternative)
+## Stripe (optional)
 
-Connect GitHub repo at https://dashboard.render.com/select-repo?repo=https://github.com/SVamseekar/employerflow
+No monthly fee — only per-transaction. Configure after Render deploy:
 
-Blueprint file: `render.yaml`
+Webhook: `https://YOUR-APP.onrender.com/api/billing/webhook`

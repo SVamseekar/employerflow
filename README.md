@@ -2,7 +2,19 @@
 
 Production-ready SaaS for visa-aware employer discovery. No LLM at any stage — deterministic scoring, template-based outreach, Stripe subscriptions.
 
-**Live stack:** FastAPI · PostgreSQL · Stripe · JWT auth · Docker
+**Infrastructure cost: $0/month** — see [FREE_STACK.md](FREE_STACK.md)
+
+**Stack:** FastAPI · PostgreSQL (Neon free) · Render free · Stripe (pay-per-sale only)
+
+---
+
+## Deploy free (production)
+
+1. Create free DB at [neon.tech](https://neon.tech) → copy connection string
+2. Deploy at [Render Blueprint](https://dashboard.render.com/select-repo?repo=https://github.com/SVamseekar/employerflow) → paste `DATABASE_URL`
+3. Delete Railway project if you created one earlier (not free)
+
+Full guide: **[FREE_STACK.md](FREE_STACK.md)**
 
 ---
 
@@ -45,57 +57,11 @@ bash scripts/setup_stripe.sh
 
 ---
 
-## Deploy to production
+## Deploy to production (free)
 
-### Option A — Fly.io
+See **[FREE_STACK.md](FREE_STACK.md)** — Render Free + Neon Free Postgres. No credit card required.
 
-```bash
-# Install flyctl, then:
-fly postgres create --name employerflow-db
-fly postgres attach employerflow-db
-
-fly secrets set \
-  SECRET_KEY=$(openssl rand -hex 32) \
-  STRIPE_SECRET_KEY=sk_live_... \
-  STRIPE_WEBHOOK_SECRET=whsec_... \
-  STRIPE_PRICE_PRO_MONTHLY=price_... \
-  STRIPE_PRICE_PREMIUM_MONTHLY=price_... \
-  APP_URL=https://employerflow.fly.dev
-
-cd deploy && fly deploy
-```
-
-Import employers after first deploy:
-
-```bash
-fly ssh console -C "python /app/scripts/import_employers.py"
-```
-
-### Option B — Railway / Render
-
-1. Add PostgreSQL plugin
-2. Set env vars from `.env.example`
-3. Deploy from `backend/Dockerfile`
-4. Mount or bake `frontend/static` into image
-5. Run `scripts/import_employers.py` once
-
-### Option C — VPS (Docker Compose)
-
-```bash
-# On server:
-git clone <repo> && cd employerflow
-cp .env.example .env  # set APP_URL to your domain, production secrets
-docker compose up -d --build
-make import
-```
-
-Put Caddy or Nginx in front for HTTPS:
-
-```
-yourdomain.com {
-  reverse_proxy localhost:8000
-}
-```
+Paid alternatives (Fly.io, Railway, Render Starter) are documented in `DEPLOYMENT.md` but not needed.
 
 ---
 
