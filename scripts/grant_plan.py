@@ -15,6 +15,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("email")
     parser.add_argument("plan", choices=["free", "pro", "premium"])
+    parser.add_argument("--permanent", action="store_true", help="Lock plan (ignore Stripe downgrades)")
     args = parser.parse_args()
 
     db = SessionLocal()
@@ -23,8 +24,13 @@ def main():
         print(f"User not found: {args.email}")
         sys.exit(1)
     user.plan = PlanTier(args.plan)
+    if args.permanent or args.plan == "premium":
+        user.plan_granted = True
+    elif args.plan == "free":
+        user.plan_granted = False
     db.commit()
-    print(f"Granted {args.plan} to {user.email}")
+    lock = " (permanent)" if user.plan_granted else ""
+    print(f"Granted {args.plan} to {user.email}{lock}")
     db.close()
 
 

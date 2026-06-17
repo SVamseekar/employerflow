@@ -67,6 +67,7 @@ def me(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
         "email": user.email,
         "full_name": user.full_name,
         "plan": user.plan.value,
+        "plan_granted": user.plan_granted,
         "profile_complete": bool(profile and profile.skills_json and profile.skills_json != "[]"),
     }
 

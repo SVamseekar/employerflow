@@ -77,6 +77,11 @@ async function loadDashboard() {
 }
 
 async function loadEmployers() {
+  const tbody = document.getElementById("emp-tbody");
+  const pageInfo = document.getElementById("emp-page-info");
+  tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted);padding:16px">Loading employers…</td></tr>';
+  pageInfo.textContent = "Loading…";
+
   const search = document.getElementById("emp-search").value;
   const region = document.getElementById("emp-region").value;
   const visa = document.getElementById("emp-visa").value;
@@ -85,19 +90,27 @@ async function loadEmployers() {
   if (region) params.set("region", region);
   if (visa) params.set("visa", visa);
 
-  const res = await api(`/api/employers?${params}`);
-  const tbody = document.getElementById("emp-tbody");
-  tbody.innerHTML = res.data.map(e => `
-    <tr>
-      <td><strong>${esc(e.company)}</strong></td>
-      <td>${esc(e.sector)}</td>
-      <td>${esc(e.country)}</td>
-      <td>${esc(e.visa_sponsorship)}</td>
-      <td>${e.score != null ? `<span class="score-badge">${e.score}</span>` : '<span style="color:var(--muted)">Pro+</span>'}</td>
-    </tr>`).join("");
-
-  document.getElementById("emp-page-info").textContent =
-    `Page ${res.page} · ${res.total} results · Plan: ${res.plan}${!res.scoring_enabled ? " (upgrade for scores)" : ""}`;
+  try {
+    const res = await api(`/api/employers?${params}`);
+    if (!res.data.length) {
+      tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted);padding:16px">No employers found. Try clearing filters.</td></tr>';
+    } else {
+      tbody.innerHTML = res.data.map(e => `
+        <tr>
+          <td><strong>${esc(e.company)}</strong></td>
+          <td>${esc(e.sector)}</td>
+          <td>${esc(e.country)}</td>
+          <td>${esc(e.visa_sponsorship)}</td>
+          <td>${e.score != null ? `<span class="score-badge">${e.score}</span>` : '<span style="color:var(--muted)">Pro+</span>'}</td>
+        </tr>`).join("");
+    }
+    pageInfo.textContent =
+      `Page ${res.page} · ${res.total.toLocaleString()} results · Plan: ${res.plan}${!res.scoring_enabled ? " (upgrade for scores)" : ""}`;
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" style="color:var(--danger);padding:16px">${esc(err.message)}</td></tr>`;
+    pageInfo.textContent = "Failed to load";
+    toast(err.message, true);
+  }
 }
 
 async function loadProfile() {

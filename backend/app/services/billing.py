@@ -69,7 +69,7 @@ def handle_webhook(payload: bytes, sig_header: str, db: Session) -> dict:
         session = event["data"]["object"]
         user_id = int(session["metadata"]["user_id"])
         user = db.get(User, user_id)
-        if user:
+        if user and not user.plan_granted:
             plan = PlanTier(session["metadata"].get("plan", "pro"))
             user.plan = plan
             user.stripe_subscription_id = session.get("subscription")
@@ -79,7 +79,7 @@ def handle_webhook(payload: bytes, sig_header: str, db: Session) -> dict:
         sub = event["data"]["object"]
         customer_id = sub["customer"]
         user = db.query(User).filter(User.stripe_customer_id == customer_id).first()
-        if user and sub.get("status") == "active":
+        if user and not user.plan_granted and sub.get("status") == "active":
             price_id = sub["items"]["data"][0]["price"]["id"]
             plan = plan_from_price_id(price_id)
             if plan:
@@ -90,7 +90,7 @@ def handle_webhook(payload: bytes, sig_header: str, db: Session) -> dict:
     elif event["type"] == "customer.subscription.deleted":
         sub = event["data"]["object"]
         user = db.query(User).filter(User.stripe_customer_id == sub["customer"]).first()
-        if user:
+        if user and not user.plan_granted:
             user.plan = PlanTier.free
             user.stripe_subscription_id = None
             db.commit()

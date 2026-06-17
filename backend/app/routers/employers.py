@@ -9,7 +9,7 @@ from app.config import get_settings
 from app.database import get_db
 from app.models import Employer, PlanTier, User, UserProfile
 from app.services.scoring import score_employer
-from app.services.validation import clean_company_name, is_valid_company
+from app.services.validation import clean_company_name
 
 router = APIRouter(prefix="/api/employers", tags=["employers"])
 settings = get_settings()
@@ -23,6 +23,34 @@ INDIA_TERMS = [
     "india", "hyderabad", "bangalore", "bengaluru", "mumbai",
     "pune", "chennai", "delhi", "noida", "gurgaon", "gurugram", "kolkata",
 ]
+
+
+def _geo_text():
+    return func.lower(
+        func.concat(
+            func.coalesce(Employer.country, ""),
+            " ",
+            func.coalesce(Employer.hiring_geography, ""),
+            " ",
+            func.coalesce(Employer.city, ""),
+        )
+    )
+
+
+def _region_filter(region: str):
+    geo = _geo_text()
+    key = region.lower()
+    if key == "europe":
+        return or_(*[geo.like(f"%{c}%") for c in EU_COUNTRIES])
+    if key == "usa":
+        return or_(*[geo.like(f"%{c}%") for c in ["usa", "united states", "u.s."]])
+    if key in ("australia/nz", "australia"):
+        return or_(*[geo.like(f"%{c}%") for c in ["australia", "new zealand"]])
+    if key == "india":
+        return or_(*[geo.like(f"%{c}%") for c in INDIA_TERMS])
+    if key in ("remote/global", "remote"):
+        return True
+    return True
 
 
 def _classify_region(emp: Employer) -> str:
@@ -61,26 +89,7 @@ def _employer_dict(emp: Employer, score: int | None = None) -> dict:
     }
 
 
-@router.get("/stats")
-def stats(db: Session = Depends(get_db)):
-    all_emps = db.query(Employer).all()
-    valid = [e for e in all_emps if is_valid_company(clean_company_name(e.company))]
-    total = len(valid)
-    visa_yes = sum(1 for e in valid if (e.visa_sponsorship or "").lower() == "yes")
-    remote_yes = sum(1 for e in valid if (e.remote or "").lower() == "yes")
-    return {"total": total, "visa_confirmed": visa_yes, "remote": remote_yes}
-
-
-@router.get("")
-def list_employers(
-    page: int = Query(1, ge=1),
-    limit: int = Query(50, ge=1, le=200),
-    search: Optional[str] = None,
-    region: Optional[str] = None,
-    visa: Optional[str] = None,
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
+def _base_query(db: Session, search: Optional[str], region: Optional[str], visa: Optional[str]):
     q = db.query(Employer)
 
     if search:
@@ -101,29 +110,65 @@ def list_employers(
     elif visa == "remote":
         q = q.filter(func.lower(Employer.remote) == "yes")
 
-    raw = q.order_by(Employer.company).all()
-    employers = []
-    for emp in raw:
-        cleaned = clean_company_name(emp.company)
-        if is_valid_company(cleaned):
-            emp.company = cleaned
-            employers.append(emp)
-
     if region:
-        employers = [e for e in employers if _classify_region(e).lower() == region.lower()]
+        clause = _region_filter(region)
+        if clause is not True:
+            q = q.filter(clause)
+
+    return q
+
+
+@router.get("/stats")
+def stats(db: Session = Depends(get_db)):
+    total = db.query(func.count(Employer.id)).scalar() or 0
+    visa_yes = (
+        db.query(func.count(Employer.id))
+        .filter(func.lower(Employer.visa_sponsorship) == "yes")
+        .scalar()
+        or 0
+    )
+    remote_yes = (
+        db.query(func.count(Employer.id))
+        .filter(func.lower(Employer.remote) == "yes")
+        .scalar()
+        or 0
+    )
+    return {"total": total, "visa_confirmed": visa_yes, "remote": remote_yes}
+
+
+@router.get("/")
+def list_employers(
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=200),
+    search: Optional[str] = None,
+    region: Optional[str] = None,
+    visa: Optional[str] = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    q = _base_query(db, search, region, visa)
+    total = q.count()
+
+    if user.plan == PlanTier.free:
+        total = min(total, settings.free_employer_limit)
+
+    start = (page - 1) * limit
+    if user.plan == PlanTier.free and start >= settings.free_employer_limit:
+        page_items = []
+    else:
+        page_items = (
+            q.order_by(Employer.company)
+            .offset(start)
+            .limit(limit if user.plan != PlanTier.free else min(limit, settings.free_employer_limit - start))
+            .all()
+        )
 
     profile = db.query(UserProfile).filter(UserProfile.user_id == user.id).first()
     can_score = user.plan != PlanTier.free
 
-    if user.plan == PlanTier.free:
-        employers = employers[: settings.free_employer_limit]
-
-    total = len(employers)
-    start = (page - 1) * limit
-    page_items = employers[start : start + limit]
-
     data = []
     for emp in page_items:
+        emp.company = clean_company_name(emp.company)
         score = score_employer(emp, profile)[0] if can_score and profile else None
         data.append(_employer_dict(emp, score))
 

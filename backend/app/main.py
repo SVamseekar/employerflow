@@ -17,7 +17,13 @@ FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "fr
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     import threading
+    from sqlalchemy import text
+
     Base.metadata.create_all(bind=engine)
+    with engine.begin() as conn:
+        conn.execute(text(
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_granted BOOLEAN DEFAULT FALSE"
+        ))
 
     def _seed():
         from app.startup import maybe_seed
