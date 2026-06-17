@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user
 from app.config import get_settings
 from app.database import get_db
-from app.models import Employer, PlanTier, User, UserProfile
+from app.models import Employer, JobSignal, PlanTier, User, UserProfile
 from app.services.data_quality import classify_employer, enrich_from_job_url
 from app.services.scoring import score_employer
 from app.services.validation import clean_company_name
@@ -157,9 +157,15 @@ def _base_query(
     return q
 
 
+def _active_hiring_names(db: Session) -> set[str]:
+    rows = db.query(func.lower(JobSignal.company)).distinct().all()
+    return {r[0].strip() for r in rows if r[0]}
+
+
 @router.get("/stats")
 def stats(db: Session = Depends(get_db)):
     total = db.query(func.count(Employer.id)).scalar() or 0
+    signals = db.query(func.count(JobSignal.id)).scalar() or 0
     visa_yes = (
         db.query(func.count(Employer.id))
         .filter(func.lower(Employer.visa_sponsorship) == "yes")
@@ -172,7 +178,12 @@ def stats(db: Session = Depends(get_db)):
         .scalar()
         or 0
     )
-    return {"total": total, "visa_confirmed": visa_yes, "remote": remote_yes}
+    return {
+        "total": total,
+        "job_signals": signals,
+        "visa_confirmed": visa_yes,
+        "remote": remote_yes,
+    }
 
 
 @router.get("/")
@@ -205,11 +216,17 @@ def list_employers(
 
     profile = db.query(UserProfile).filter(UserProfile.user_id == user.id).first()
     can_score = user.plan != PlanTier.free
+    hiring_active = _active_hiring_names(db) if can_score else set()
 
     data = []
     for emp in page_items:
         emp.company = clean_company_name(emp.company)
-        score = score_employer(emp, profile)[0] if can_score and profile else None
+        score = None
+        if can_score and profile:
+            score, _ = score_employer(
+                emp, profile,
+                active_hiring=emp.company.lower().strip() in hiring_active,
+            )
         data.append(_employer_dict(emp, score))
 
     return {
@@ -245,8 +262,18 @@ def get_employer(
     profile = db.query(UserProfile).filter(UserProfile.user_id == user.id).first()
     can_score = user.plan != PlanTier.free
     emp.company = clean_company_name(emp.company)
-    score = score_employer(emp, profile)[0] if can_score and profile else None
-    return _employer_dict(emp, score)
+    active = emp.company.lower().strip() in _active_hiring_names(db)
+    score = None
+    if can_score and profile:
+        score, _ = score_employer(emp, profile, active_hiring=active)
+    out = _employer_dict(emp, score)
+    out["active_job_listings"] = (
+        db.query(func.count(JobSignal.id))
+        .filter(func.lower(JobSignal.company) == emp.company.lower().strip())
+        .scalar()
+        or 0
+    )
+    return out
 
 
 @router.post("/{employer_id}/enrich")

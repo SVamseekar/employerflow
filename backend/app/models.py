@@ -62,6 +62,24 @@ class UserProfile(Base):
     user: Mapped["User"] = relationship(back_populates="profile")
 
 
+class JobSignal(Base):
+    __tablename__ = "job_signals"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    company: Mapped[str] = mapped_column(String(255), index=True)
+    job_title: Mapped[str] = mapped_column(Text, default="")
+    job_url: Mapped[str] = mapped_column(Text, default="")
+    country: Mapped[str] = mapped_column(Text, default="")
+    city: Mapped[str] = mapped_column(Text, default="")
+    sector: Mapped[str] = mapped_column(Text, default="")
+    tech_stack: Mapped[str] = mapped_column(Text, default="")
+    source: Mapped[str] = mapped_column(Text, default="")
+    reason_match: Mapped[str] = mapped_column(Text, default="")
+    hiring_confidence: Mapped[str] = mapped_column(String(50), default="")
+    language_requirement: Mapped[str] = mapped_column(String(100), default="")
+    scraped_at: Mapped[str] = mapped_column(String(20), default="")
+
+
 class Employer(Base):
     __tablename__ = "employers"
 

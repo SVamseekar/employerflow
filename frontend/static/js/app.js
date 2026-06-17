@@ -5,10 +5,12 @@ let selectedEmployerId = null;
 let shortlistData = [];
 let selectedShortlistId = null;
 let activeView = "dashboard";
+let radarPage = 1;
 
 const PAGE_META = {
   dashboard: { eyebrow: "Overview", title: "Dashboard" },
-  directory: { eyebrow: "Discovery", title: "Employer directory" },
+  directory: { eyebrow: "Companies", title: "Verified employer directory" },
+  radar: { eyebrow: "Live signals", title: "Hiring radar" },
   profile: { eyebrow: "Your data", title: "Profile" },
   shortlist: { eyebrow: "Pipeline", title: "Shortlist & outreach" },
   crm: { eyebrow: "Tracking", title: "Application CRM" },
@@ -315,6 +317,7 @@ function switchView(name) {
 
   if (name === "dashboard") loadDashboard();
   if (name === "directory") loadEmployers();
+  if (name === "radar") loadHiringRadar();
   if (name === "profile") loadProfile();
   if (name === "shortlist") loadShortlist();
   if (name === "crm") loadCRM();
@@ -353,18 +356,19 @@ async function loadDashboard() {
   try {
     const stats = await api("/api/employers/stats");
     const plan = getUser().plan || "free";
+    const signals = stats.job_signals != null ? stats.job_signals.toLocaleString() : "—";
     document.getElementById("dash-stats").innerHTML = `
       <div class="stat-card">
-        <div class="label">Total employers</div>
+        <div class="label">Verified companies</div>
         <div class="value">${stats.total.toLocaleString()}</div>
+      </div>
+      <div class="stat-card accent-copper">
+        <div class="label">Live job signals</div>
+        <div class="value">${signals}</div>
       </div>
       <div class="stat-card accent-teal">
         <div class="label">Visa confirmed</div>
         <div class="value">${stats.visa_confirmed.toLocaleString()}</div>
-      </div>
-      <div class="stat-card accent-signal">
-        <div class="label">Remote-friendly</div>
-        <div class="value">${stats.remote.toLocaleString()}</div>
       </div>
       <div class="stat-card">
         <div class="label">Your plan</div>
@@ -376,6 +380,53 @@ async function loadDashboard() {
     toast(err.message, true);
   } finally {
     setViewLoading("view-dashboard", false);
+  }
+}
+
+async function loadHiringRadar(btn) {
+  const body = document.getElementById("radar-body");
+  const pageInfo = document.getElementById("radar-page-info");
+  const pager = document.getElementById("radar-pager");
+  const upgrade = document.getElementById("radar-upgrade");
+  setViewLoading("view-radar", true);
+  if (btn) setButtonLoading(btn, true, "Loading…");
+  if (body) body.innerHTML = `<tr><td colspan="5">Loading…</td></tr>`;
+  if (upgrade) upgrade.classList.add("hidden");
+
+  const search = document.getElementById("radar-search")?.value || "";
+  const params = new URLSearchParams({ page: radarPage, limit: 50 });
+  if (search) params.set("search", search);
+
+  try {
+    const res = await api(`/api/hiring-radar?${params}`);
+    if (!res.data.length) {
+      body.innerHTML = `<tr><td colspan="5" class="queue-empty">No job signals match.</td></tr>`;
+    } else {
+      body.innerHTML = res.data.map(j => `
+        <tr>
+          <td><strong>${esc(j.company)}</strong></td>
+          <td>${esc(j.job_title)}</td>
+          <td>${esc([j.city, j.country].filter(Boolean).join(", ") || "—")}</td>
+          <td><span class="detail-chip">${esc((j.source || "").split(" - ")[0])}</span></td>
+          <td>${j.job_url ? `<a href="${esc(j.job_url)}" target="_blank" rel="noopener" class="detail-link">Open ↗</a>` : ""}</td>
+        </tr>`).join("");
+    }
+    pageInfo.textContent = `${res.total.toLocaleString()} signals visible · ${res.total_in_db?.toLocaleString() || res.total} in database`;
+    pager.textContent = `Page ${res.page}`;
+    if (res.upgrade_for_more && getUser().plan !== "premium") {
+      pageInfo.textContent += " · Upgrade for full access";
+    }
+  } catch (err) {
+    if (err.message.includes("402") || err.message.toLowerCase().includes("pro")) {
+      if (upgrade) upgrade.classList.remove("hidden");
+      body.innerHTML = `<tr><td colspan="5">Upgrade to Pro to browse live hiring signals.</td></tr>`;
+    } else {
+      body.innerHTML = `<tr><td colspan="5" style="color:var(--danger)">${esc(err.message)}</td></tr>`;
+      toast(err.message, true);
+    }
+  } finally {
+    setViewLoading("view-radar", false);
+    if (btn) setButtonLoading(btn, false);
   }
 }
 

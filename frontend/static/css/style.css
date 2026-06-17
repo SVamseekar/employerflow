@@ -1053,6 +1053,27 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--mist); m
   margin: 0;
 }
 
+.radar-table-wrap { overflow-x: auto; }
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.data-table th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fog);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.data-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.stat-card.accent-copper .value { color: var(--copper); }
+
 @media (max-width: 900px) {
   .directory-workspace {
     flex-direction: column;

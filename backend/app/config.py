@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     free_employer_limit: int = 100
     pro_shortlist_limit: int = 100
     premium_shortlist_limit: int = 500
+    free_hiring_radar_limit: int = 0
+    pro_hiring_radar_limit: int = 200
+    premium_hiring_radar_limit: int = 12000
 
     @property
     def cors_origin_list(self) -> list[str]:

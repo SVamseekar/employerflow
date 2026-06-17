@@ -8,11 +8,11 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
 from app.database import Base, engine
-from app.routers import applications, auth, billing, employers, shortlist
+from app.routers import applications, auth, billing, employers, hiring_radar, shortlist
 
 settings = get_settings()
 FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "static"))
-ASSET_VERSION = os.environ.get("ASSET_VERSION", "ui5")
+ASSET_VERSION = os.environ.get("ASSET_VERSION", "ui6")
 NO_CACHE = {"Cache-Control": "no-cache, no-store, must-revalidate"}
 
 
@@ -48,6 +48,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(billing.router)
 app.include_router(employers.router)
+app.include_router(hiring_radar.router)
 app.include_router(shortlist.router)
 app.include_router(applications.router)
 

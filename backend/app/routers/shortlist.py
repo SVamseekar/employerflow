@@ -4,7 +4,9 @@ from sqlalchemy.orm import Session, joinedload
 from app.auth import get_current_user, require_plan
 from app.config import get_settings
 from app.database import get_db
-from app.models import Employer, PlanTier, ShortlistItem, User, UserProfile
+from sqlalchemy import func
+
+from app.models import Employer, JobSignal, PlanTier, ShortlistItem, User, UserProfile
 from app.schemas import ShortlistUpdate
 from app.services.email_generator import generate_email, guess_to_email
 from app.services.scoring import score_all
@@ -59,7 +61,12 @@ def generate_shortlist(
 
     employers = db.query(Employer).all()
     limit = _limit_for_plan(user.plan)
-    scored = score_all(employers, profile, min_score=20, limit=limit)
+    hiring = {
+        r[0].strip()
+        for r in db.query(func.lower(JobSignal.company)).distinct().all()
+        if r[0]
+    }
+    scored = score_all(employers, profile, min_score=20, limit=limit, active_hiring=hiring)
 
     db.query(ShortlistItem).filter(ShortlistItem.user_id == user.id).delete()
 

@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/style.css?v=ui5">
+  <link rel="stylesheet" href="/static/css/style.css?v=ui6">
 </head>
 <body>
 <div id="global-loader" class="global-loader" aria-hidden="true"></div>
@@ -67,7 +67,11 @@
     </button>
     <button class="nav-item" data-view="directory" onclick="switchView('directory')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
-      <span>Employers</span>
+      <span>Companies</span>
+    </button>
+    <button class="nav-item" data-view="radar" onclick="switchView('radar')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><circle cx="12" cy="12" r="3"/></svg>
+      <span>Hiring radar</span>
     </button>
     <button class="nav-item" data-view="shortlist" onclick="switchView('shortlist')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/></svg>
@@ -119,7 +123,11 @@
             </button>
             <button type="button" class="action-card" onclick="switchView('directory')">
               <div class="icon">🔍</div>
-              <div><strong>Browse employers</strong><span>Filter by region & visa</span></div>
+              <div><strong>Browse companies</strong><span>3,500+ verified employers</span></div>
+            </button>
+            <button type="button" class="action-card" onclick="switchView('radar')">
+              <div class="icon">📡</div>
+              <div><strong>Hiring radar</strong><span>11,000+ live job signals</span></div>
             </button>
             <button type="button" class="action-card" onclick="switchView('shortlist')">
               <div class="icon">✉️</div>
@@ -181,6 +189,43 @@
           <button class="btn btn-ghost btn-sm" id="btn-emp-prev" onclick="empPage=Math.max(1,empPage-1);loadEmployers(this)">← Previous</button>
           <span class="pagination-info" id="emp-page-info">—</span>
           <button class="btn btn-ghost btn-sm" id="btn-emp-next" onclick="empPage++;loadEmployers(this)">Next →</button>
+        </div>
+      </section>
+
+      <section id="view-radar" class="view hidden">
+        <div class="panel" style="margin-bottom:16px">
+          <p class="panel-desc" id="radar-intro">Live job signals from Indeed, LinkedIn, Seek, Naukri, and all pipeline sources — matched to your regions.</p>
+        </div>
+        <div class="filter-bar">
+          <div class="search-wrap">
+            <input type="search" id="radar-search" placeholder="Search company, role, city…" onkeyup="if(event.key==='Enter'){radarPage=1;loadHiringRadar()}">
+          </div>
+          <button class="btn btn-primary" onclick="radarPage=1;loadHiringRadar(this)">Search</button>
+        </div>
+        <div class="panel">
+          <div class="panel-header">
+            <div>
+              <h3>Open roles</h3>
+              <p class="panel-desc" id="radar-page-info">—</p>
+            </div>
+          </div>
+          <div id="radar-upgrade" class="detail-banner hidden" style="margin:0 0 16px">
+            <p>Hiring Radar is included on Pro. See which companies are actively posting roles in your target regions.</p>
+            <button class="btn btn-primary btn-sm" onclick="switchView('billing')">Upgrade</button>
+          </div>
+          <div class="radar-table-wrap">
+            <table class="data-table" id="radar-table">
+              <thead>
+                <tr><th>Company</th><th>Role</th><th>Location</th><th>Source</th><th></th></tr>
+              </thead>
+              <tbody id="radar-body"><tr><td colspan="5">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="pagination">
+          <button class="btn btn-ghost btn-sm" onclick="radarPage=Math.max(1,radarPage-1);loadHiringRadar(this)">← Previous</button>
+          <span class="pagination-info" id="radar-pager">—</span>
+          <button class="btn btn-ghost btn-sm" onclick="radarPage++;loadHiringRadar(this)">Next →</button>
         </div>
       </section>
 
@@ -294,7 +339,7 @@
   </div>
 </div>
 
-<script src="/static/js/api.js?v=ui5"></script>
-<script src="/static/js/app.js?v=ui5"></script>
+<script src="/static/js/api.js?v=ui6"></script>
+<script src="/static/js/app.js?v=ui6"></script>
 </body>
 </html>

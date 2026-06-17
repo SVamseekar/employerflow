@@ -101,7 +101,11 @@ def employer_to_row(emp: Employer) -> dict[str, str]:
     }
 
 
-def score_employer(emp: Employer, profile: UserProfile | None = None) -> tuple[int, str]:
+def score_employer(
+    emp: Employer,
+    profile: UserProfile | None = None,
+    active_hiring: bool = False,
+) -> tuple[int, str]:
     row = employer_to_row(emp)
     themes = _profile_themes(profile)
     user_skills = [s.lower() for s in _profile_skills(profile)]
@@ -203,13 +207,26 @@ def score_employer(emp: Employer, profile: UserProfile | None = None) -> tuple[i
         s += 5
         notes.append("YC backed")
 
+    if active_hiring:
+        s += 20
+        notes.append("Active hiring signal")
+
     return s, "; ".join(notes)
 
 
-def score_all(employers: list[Employer], profile: UserProfile | None, min_score: int = 20, limit: int = 500) -> list[dict[str, Any]]:
+def score_all(
+    employers: list[Employer],
+    profile: UserProfile | None,
+    min_score: int = 20,
+    limit: int = 500,
+    active_hiring: set[str] | None = None,
+) -> list[dict[str, Any]]:
+    active = active_hiring or set()
     scored = []
     for emp in employers:
-        score, notes = score_employer(emp, profile)
+        score, notes = score_employer(
+            emp, profile, active_hiring=emp.company.lower().strip() in active
+        )
         if score >= min_score:
             scored.append({"employer": emp, "score": score, "match_notes": notes})
     scored.sort(key=lambda x: x["score"], reverse=True)
