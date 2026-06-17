@@ -881,7 +881,112 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--mist); m
   font-family: var(--font);
 }
 
+/* Directory — list + full field detail */
+.directory-workspace {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  min-height: calc(100vh - var(--topbar-h) - 200px);
+  max-height: calc(100vh - var(--topbar-h) - 200px);
+  overflow: hidden;
+}
+.directory-list {
+  width: 300px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--elevated);
+}
+.directory-detail {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding: 20px 24px 28px;
+}
+.detail-placeholder {
+  color: var(--fog);
+  font-size: 14px;
+  padding: 40px 0;
+}
+.detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+.detail-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.detail-header .detail-score { flex-shrink: 0; }
+.detail-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 10px;
+}
+.detail-links a {
+  font-size: 13px;
+  color: var(--signal);
+}
+.detail-section {
+  margin-bottom: 22px;
+}
+.detail-section h4 {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fog);
+  margin-bottom: 10px;
+}
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px 20px;
+}
+.field-item dt {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fog);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 3px;
+}
+.field-item dd {
+  font-size: 14px;
+  color: var(--snow);
+  line-height: 1.45;
+  word-break: break-word;
+}
+.field-item dd.is-empty { color: var(--fog); font-style: italic; }
+.field-item.full { grid-column: 1 / -1; }
+.field-item dd.reason-text {
+  font-size: 13px;
+  color: var(--mist);
+  line-height: 1.55;
+  max-width: 720px;
+}
+
 @media (max-width: 900px) {
+  .directory-workspace {
+    flex-direction: column;
+    max-height: none;
+    min-height: 480px;
+  }
+  .directory-list {
+    width: 100%;
+    max-height: 200px;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+  }
   .shortlist-workspace {
     flex-direction: column;
     max-height: none;

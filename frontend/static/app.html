@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/style.css?v=ui3">
+  <link rel="stylesheet" href="/static/css/style.css?v=ui4">
 </head>
 <body>
 <div id="global-loader" class="global-loader" aria-hidden="true"></div>
@@ -158,11 +158,16 @@
           </div>
           <button class="btn btn-primary" id="btn-emp-search" onclick="empPage=1;loadEmployers(this)">Search</button>
         </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Company</th><th>Sector</th><th>Country</th><th>Visa</th><th>Match</th></tr></thead>
-            <tbody id="emp-tbody"></tbody>
-          </table>
+        <div class="directory-workspace" id="directory-workspace">
+          <aside class="directory-list">
+            <div class="queue-toolbar">
+              <span class="queue-count" id="emp-list-count">—</span>
+            </div>
+            <ul id="emp-queue" class="queue-list" role="listbox"></ul>
+          </aside>
+          <div class="directory-detail" id="emp-detail">
+            <p class="detail-placeholder">Select a company to view all database fields.</p>
+          </div>
         </div>
         <div class="pagination">
           <button class="btn btn-ghost btn-sm" id="btn-emp-prev" onclick="empPage=Math.max(1,empPage-1);loadEmployers(this)">← Previous</button>
@@ -281,7 +286,7 @@
   </div>
 </div>
 
-<script src="/static/js/api.js?v=ui3"></script>
-<script src="/static/js/app.js?v=ui3"></script>
+<script src="/static/js/api.js?v=ui4"></script>
+<script src="/static/js/app.js?v=ui4"></script>
 </body>
 </html>

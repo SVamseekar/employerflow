@@ -1,5 +1,7 @@
 let authMode = "login";
 let empPage = 1;
+let employersData = [];
+let selectedEmployerId = null;
 let shortlistData = [];
 let selectedShortlistId = null;
 let activeView = "dashboard";
@@ -61,6 +63,132 @@ function scoreBadge(score) {
   const n = Number(score);
   const cls = n >= 60 ? "score-high" : n >= 35 ? "score-mid" : "score-low";
   return `<span class="score-badge ${cls}">${n}</span>`;
+}
+
+function fieldValue(val) {
+  const s = String(val || "").trim();
+  if (!s || s.toLowerCase() === "unknown" || s.toLowerCase() === "none") return null;
+  return s;
+}
+
+function fieldItem(label, value, full = false) {
+  const v = fieldValue(value);
+  const cls = full ? "field-item full" : "field-item";
+  return `<div class="${cls}"><dt>${esc(label)}</dt><dd class="${v ? "" : "is-empty"}">${v ? esc(v) : "—"}</dd></div>`;
+}
+
+function linkField(label, url) {
+  const u = fieldValue(url);
+  if (!u || !u.startsWith("http")) return fieldItem(label, url);
+  return `<div class="field-item"><dt>${esc(label)}</dt><dd><a href="${esc(u)}" target="_blank" rel="noopener">${esc(u)}</a></dd></div>`;
+}
+
+function renderEmployerDetail(emp) {
+  const el = document.getElementById("emp-detail");
+  if (!el || !emp) return;
+
+  const links = [];
+  if (fieldValue(emp.website)) links.push(`<a href="${esc(emp.website)}" target="_blank" rel="noopener">Website</a>`);
+  if (fieldValue(emp.careers_url)) links.push(`<a href="${esc(emp.careers_url)}" target="_blank" rel="noopener">Careers page</a>`);
+
+  el.innerHTML = `
+    <header class="detail-header">
+      <div>
+        <h3>${esc(emp.company)}</h3>
+        <div class="detail-links">${links.join("") || '<span style="color:var(--fog);font-size:13px">No links on file</span>'}</div>
+      </div>
+      <div class="detail-score">${scoreBadge(emp.score)}</div>
+    </header>
+
+    <section class="detail-section">
+      <h4>Company</h4>
+      <dl class="field-grid">
+        ${fieldItem("Sector", emp.sector)}
+        ${fieldItem("Subsector", emp.subsector)}
+        ${fieldItem("Category", emp.employer_category)}
+        ${fieldItem("Stage", emp.company_stage)}
+        ${fieldItem("Scale", emp.company_scale)}
+        ${fieldItem("Source", emp.source)}
+        ${fieldItem("Hiring confidence", emp.hiring_confidence)}
+      </dl>
+    </section>
+
+    <section class="detail-section">
+      <h4>Location</h4>
+      <dl class="field-grid">
+        ${fieldItem("Country", emp.country)}
+        ${fieldItem("City", emp.city)}
+        ${fieldItem("Region", emp.region)}
+        ${fieldItem("Hiring geography", emp.hiring_geography)}
+        ${fieldItem("Region eligibility", emp.region_eligibility)}
+      </dl>
+    </section>
+
+    <section class="detail-section">
+      <h4>Hiring</h4>
+      <dl class="field-grid">
+        ${fieldItem("Target roles", emp.target_roles, true)}
+        ${fieldItem("Tech stack", emp.tech_stack, true)}
+        ${fieldItem("Remote", emp.remote)}
+        ${fieldItem("Language requirement", emp.language_requirement)}
+      </dl>
+    </section>
+
+    <section class="detail-section">
+      <h4>Visa & work authorization</h4>
+      <dl class="field-grid">
+        ${fieldItem("Visa sponsorship", emp.visa_sponsorship)}
+        ${fieldItem("Visa sponsor register", emp.visa_sponsor_register)}
+        ${fieldItem("EOR", emp.eor)}
+      </dl>
+    </section>
+
+    <section class="detail-section">
+      <h4>Why it matched</h4>
+      <dl class="field-grid">
+        <div class="field-item full">
+          <dt>Reason</dt>
+          <dd class="reason-text">${fieldValue(emp.reason_match) ? esc(emp.reason_match) : "—"}</dd>
+        </div>
+      </dl>
+    </section>`;
+}
+
+function renderEmployerQueue(items) {
+  const list = document.getElementById("emp-queue");
+  const count = document.getElementById("emp-list-count");
+  if (!list) return;
+
+  if (count) count.textContent = `${items.length} on this page`;
+
+  if (!items.length) {
+    list.innerHTML = `<li class="queue-empty">No results</li>`;
+    return;
+  }
+
+  list.innerHTML = items.map(e => `
+    <li>
+      <button type="button" class="queue-item${e.id === selectedEmployerId ? " active" : ""}"
+        data-id="${e.id}" onclick="selectEmployer(${e.id})" role="option"
+        aria-selected="${e.id === selectedEmployerId}">
+        <span class="q-score">${e.score != null ? e.score : "—"}</span>
+        <span class="q-info">
+          <span class="q-name">${esc(e.company)}</span>
+          <span class="q-loc">${esc(e.country)} · ${esc(e.sector)}</span>
+        </span>
+      </button>
+    </li>`).join("");
+}
+
+function selectEmployer(id) {
+  selectedEmployerId = id;
+  document.querySelectorAll("#emp-queue .queue-item").forEach(el => {
+    const on = Number(el.dataset.id) === id;
+    el.classList.toggle("active", on);
+    el.setAttribute("aria-selected", on);
+  });
+  const emp = employersData.find(e => e.id === id);
+  if (emp) renderEmployerDetail(emp);
 }
 
 function showAuthTab(mode) {
@@ -177,11 +305,13 @@ async function loadDashboard() {
 }
 
 async function loadEmployers(btn) {
-  const tbody = document.getElementById("emp-tbody");
   const pageInfo = document.getElementById("emp-page-info");
+  const detail = document.getElementById("emp-detail");
   setViewLoading("view-directory", true);
   if (btn) setButtonLoading(btn, true, "Loading…");
-  tbody.innerHTML = loadingTableRow(5, "Loading employers…");
+  const queue = document.getElementById("emp-queue");
+  if (queue) queue.innerHTML = `<li class="queue-empty">Loading…</li>`;
+  if (detail) detail.innerHTML = `<p class="detail-placeholder">Loading…</p>`;
   pageInfo.textContent = "Loading…";
 
   const search = document.getElementById("emp-search").value;
@@ -194,34 +324,20 @@ async function loadEmployers(btn) {
 
   try {
     const res = await api(`/api/employers?${params}`);
-    if (!res.data.length) {
-      tbody.innerHTML = `<tr><td colspan="5">
-        <div class="empty-state" style="padding:32px">
-          <div class="empty-icon">🔍</div>
-          <h3>No employers found</h3>
-          <p>Try clearing filters or broadening your search.</p>
-        </div></td></tr>`;
+    employersData = res.data || [];
+    renderEmployerQueue(employersData);
+
+    if (!employersData.length) {
+      selectedEmployerId = null;
+      if (detail) detail.innerHTML = `<p class="detail-placeholder">No employers match these filters.</p>`;
     } else {
-      tbody.innerHTML = res.data.map(e => `
-        <tr>
-          <td>
-            <div class="company-cell">
-              ${companyAvatar(e.company)}
-              <div>
-                <div class="company-name">${esc(e.company)}</div>
-                <div class="company-sub">${esc(e.region || "")}</div>
-              </div>
-            </div>
-          </td>
-          <td>${esc(e.sector)}</td>
-          <td>${esc(e.country)}</td>
-          <td>${visaPill(e.visa_sponsorship)}</td>
-          <td>${scoreBadge(e.score)}</td>
-        </tr>`).join("");
+      const stillHere = employersData.some(e => e.id === selectedEmployerId);
+      if (!stillHere) selectedEmployerId = employersData[0].id;
+      selectEmployer(selectedEmployerId);
     }
-    pageInfo.textContent = `Page ${res.page} · ${res.total.toLocaleString()} results · ${res.plan}${!res.scoring_enabled ? " · upgrade for scores" : ""}`;
+    pageInfo.textContent = `Page ${res.page} · ${res.total.toLocaleString()} total · ${res.plan}${!res.scoring_enabled ? " · upgrade for scores" : ""}`;
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="5" style="color:var(--danger);padding:16px">${esc(err.message)}</td></tr>`;
+    if (detail) detail.innerHTML = `<p class="detail-placeholder" style="color:var(--danger)">${esc(err.message)}</p>`;
     pageInfo.textContent = "Failed to load";
     toast(err.message, true);
   } finally {

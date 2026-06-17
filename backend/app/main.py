@@ -12,7 +12,7 @@ from app.routers import applications, auth, billing, employers, shortlist
 
 settings = get_settings()
 FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "static"))
-ASSET_VERSION = os.environ.get("ASSET_VERSION", "ui3")
+ASSET_VERSION = os.environ.get("ASSET_VERSION", "ui4")
 NO_CACHE = {"Cache-Control": "no-cache, no-store, must-revalidate"}
 
 

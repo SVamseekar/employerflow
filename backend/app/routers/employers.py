@@ -1,6 +1,6 @@
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
@@ -75,15 +75,22 @@ def _employer_dict(emp: Employer, score: int | None = None) -> dict:
         "country": emp.country,
         "city": emp.city,
         "sector": emp.sector,
+        "subsector": emp.subsector,
         "company_stage": emp.company_stage,
+        "company_scale": emp.company_scale,
         "employer_category": emp.employer_category,
         "remote": emp.remote,
         "visa_sponsorship": emp.visa_sponsorship,
-        "visa_sponsor_register": emp.visa_sponsor_register,
+        "eor": emp.eor,
+        "hiring_geography": emp.hiring_geography,
+        "target_roles": emp.target_roles,
         "tech_stack": emp.tech_stack,
+        "region_eligibility": emp.region_eligibility,
         "language_requirement": emp.language_requirement,
+        "hiring_confidence": emp.hiring_confidence,
         "reason_match": emp.reason_match,
         "source": emp.source,
+        "visa_sponsor_register": emp.visa_sponsor_register,
         "region": _classify_region(emp),
         "score": score,
     }
@@ -180,3 +187,30 @@ def list_employers(
         "scoring_enabled": can_score,
         "data": data,
     }
+
+
+@router.get("/{employer_id}")
+def get_employer(
+    employer_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    emp = db.get(Employer, employer_id)
+    if not emp:
+        raise HTTPException(status_code=404, detail="Employer not found")
+
+    if user.plan == PlanTier.free:
+        allowed = (
+            db.query(Employer.id)
+            .order_by(Employer.company)
+            .limit(settings.free_employer_limit)
+            .all()
+        )
+        if employer_id not in {row[0] for row in allowed}:
+            raise HTTPException(status_code=402, detail="Upgrade to Pro to view full employer details.")
+
+    profile = db.query(UserProfile).filter(UserProfile.user_id == user.id).first()
+    can_score = user.plan != PlanTier.free
+    emp.company = clean_company_name(emp.company)
+    score = score_employer(emp, profile)[0] if can_score and profile else None
+    return _employer_dict(emp, score)
