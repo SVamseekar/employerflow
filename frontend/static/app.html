@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
+<div id="global-loader" class="global-loader" aria-hidden="true"></div>
 
 <div id="auth-screen" class="auth-screen">
   <div class="auth-card">
@@ -84,7 +85,7 @@
           <option value="possible">Visa possible</option>
           <option value="remote">Remote only</option>
         </select>
-        <button class="btn btn-primary" onclick="loadEmployers()">Search</button>
+        <button class="btn btn-primary" id="btn-emp-search" onclick="empPage=1;loadEmployers(this)">Search</button>
       </div>
       <div class="table-wrap">
         <table>
@@ -93,14 +94,14 @@
         </table>
       </div>
       <div class="toolbar" style="margin-top:12px">
-        <button class="btn btn-ghost" onclick="empPage--;loadEmployers()">← Prev</button>
+        <button class="btn btn-ghost" id="btn-emp-prev" onclick="empPage--;loadEmployers(this)">← Prev</button>
         <span id="emp-page-info" style="color:var(--muted);font-size:13px"></span>
-        <button class="btn btn-ghost" onclick="empPage++;loadEmployers()">Next →</button>
+        <button class="btn btn-ghost" id="btn-emp-next" onclick="empPage++;loadEmployers(this)">Next →</button>
       </div>
     </section>
 
     <section id="view-profile" class="view hidden">
-      <div class="page-header"><h2>Your Profile</h2><button class="btn btn-primary" onclick="saveProfile()">Save Profile</button></div>
+      <div class="page-header"><h2>Your Profile</h2><button class="btn btn-primary" id="btn-save-profile" onclick="saveProfile(this)">Save Profile</button></div>
       <div class="panel">
         <div class="form-grid">
           <div><label>Headline</label><input id="p-headline" placeholder="AI/Data Engineer"></div>
@@ -123,7 +124,7 @@
     <section id="view-shortlist" class="view hidden">
       <div class="page-header">
         <h2>Shortlist & Outreach</h2>
-        <button class="btn btn-primary" onclick="generateShortlist()">Generate Shortlist</button>
+        <button class="btn btn-primary" id="btn-generate-shortlist" onclick="generateShortlist(this)">Generate Shortlist</button>
       </div>
       <div id="shortlist-empty" class="panel hidden"><p style="color:var(--muted)">No shortlist yet. Complete your profile and click Generate.</p></div>
       <div id="shortlist-detail" class="hidden">
@@ -135,7 +136,7 @@
             <div><label>Job URL</label><input id="sl-job"></div>
             <div class="full"><label>Email draft</label><textarea id="sl-draft" rows="14"></textarea></div>
           </div>
-          <button class="btn btn-success" style="margin-top:12px" onclick="saveShortlistItem()">Save Draft</button>
+          <button class="btn btn-success" id="btn-save-draft" style="margin-top:12px" onclick="saveShortlistItem(this)">Save Draft</button>
         </div>
         <div class="table-wrap">
           <table>
@@ -166,7 +167,7 @@
             <div><label>Follow-up date</label><input type="date" id="crm-followup"></div>
             <div class="full"><label>Notes</label><input id="crm-notes"></div>
           </div>
-          <button class="btn btn-primary" style="margin-top:12px" onclick="addApplication()">Add</button>
+          <button class="btn btn-primary" id="btn-add-app" style="margin-top:12px" onclick="addApplication(this)">Add</button>
         </div>
         <div class="table-wrap">
           <table>
@@ -181,7 +182,7 @@
       <div class="page-header"><h2>Billing</h2></div>
       <div class="pricing-grid" id="billing-plans"></div>
       <div class="panel" style="margin-top:20px">
-        <button class="btn btn-ghost" onclick="openPortal()">Manage subscription (Stripe Portal)</button>
+        <button class="btn btn-ghost" id="btn-billing-portal" onclick="openPortal(this)">Manage subscription (Stripe Portal)</button>
       </div>
     </section>
   </main>
