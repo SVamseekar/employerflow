@@ -73,85 +73,159 @@ function fieldValue(val) {
 
 function fieldItem(label, value, full = false) {
   const v = fieldValue(value);
+  if (!v) return "";
   const cls = full ? "field-item full" : "field-item";
-  return `<div class="${cls}"><dt>${esc(label)}</dt><dd class="${v ? "" : "is-empty"}">${v ? esc(v) : "—"}</dd></div>`;
+  return `<div class="${cls}"><dt>${esc(label)}</dt><dd>${esc(v)}</dd></div>`;
 }
 
-function linkField(label, url) {
+function linkField(label, url, linkText) {
   const u = fieldValue(url);
-  if (!u || !u.startsWith("http")) return fieldItem(label, url);
-  return `<div class="field-item"><dt>${esc(label)}</dt><dd><a href="${esc(u)}" target="_blank" rel="noopener">${esc(u)}</a></dd></div>`;
+  if (!u || !u.startsWith("http")) return "";
+  const text = linkText || u.replace(/^https?:\/\/(www\.)?/, "").split("/")[0];
+  return `<div class="field-item"><dt>${esc(label)}</dt><dd><a href="${esc(u)}" target="_blank" rel="noopener">${esc(text)}</a></dd></div>`;
 }
 
-function renderEmployerDetail(emp) {
+function detailSection(title, html) {
+  if (!html || !html.trim()) return "";
+  return `<section class="detail-section"><h4>${esc(title)}</h4><dl class="field-grid">${html}</dl></section>`;
+}
+
+function qualityBanner(emp) {
+  const tier = emp.data_quality || (emp.is_job_posting ? "job_posting" : "partial");
+  if (tier === "verified") return "";
+
+  const messages = {
+    job_posting: "This looks like a scraped job posting, not a verified company profile. Most fields are empty because we only captured the listing.",
+    sparse: "Limited company data on file — only a few fields are populated.",
+    partial: "Partial profile — some company details are still missing.",
+  };
+  const msg = messages[tier] || messages.partial;
+  const enrichBtn = emp.can_enrich
+    ? `<button type="button" class="btn btn-ghost btn-sm" id="btn-enrich-emp" onclick="enrichEmployer(this)">Fill from job posting</button>`
+    : "";
+
+  return `<div class="detail-banner detail-banner--${tier}">
+    <p>${esc(msg)}</p>
+    ${enrichBtn}
+  </div>`;
+}
+
+function renderEnrichmentBlock(data) {
+  if (!data || !data.suggestions) return "";
+  const s = data.suggestions;
+  const rows = [];
+  if (s.company) rows.push(fieldItem("Company (from posting)", s.company));
+  if (s.target_roles) rows.push(fieldItem("Role", s.target_roles));
+  if (s.tech_stack) rows.push(fieldItem("Tech stack", s.tech_stack, true));
+  if (s.city) rows.push(fieldItem("City", s.city));
+  if (s.country) rows.push(fieldItem("Country", s.country));
+  if (s.remote) rows.push(fieldItem("Remote", s.remote));
+  if (!rows.length) return "";
+
+  const snippet = data.description_snippet
+    ? `<p class="enrich-snippet">${esc(data.description_snippet)}</p>` : "";
+  const note = data.note ? `<p class="enrich-snippet">${esc(data.note)}</p>` : "";
+
+  return `<section class="detail-section detail-section--enriched">
+    <h4>From job posting</h4>
+    <dl class="field-grid">${rows.join("")}</dl>
+    ${snippet}${note}
+  </section>`;
+}
+
+function renderEmployerDetail(emp, enrichment) {
   const el = document.getElementById("emp-detail");
   if (!el || !emp) return;
 
+  const loc = [fieldValue(emp.city), fieldValue(emp.country)].filter(Boolean).join(", ");
+  const chips = [];
+  if (fieldValue(emp.sector)) chips.push(`<span class="detail-chip">${esc(emp.sector)}</span>`);
+  if (fieldValue(emp.hiring_confidence)) chips.push(`<span class="detail-chip">${esc(emp.hiring_confidence)} confidence</span>`);
+  if (fieldValue(emp.target_roles)) chips.push(`<span class="detail-chip">${esc(emp.target_roles)}</span>`);
+  if (emp.data_quality === "job_posting") chips.push(`<span class="detail-chip detail-chip--warn">Job listing</span>`);
+
   const links = [];
-  if (fieldValue(emp.website)) links.push(`<a href="${esc(emp.website)}" target="_blank" rel="noopener">Website</a>`);
-  if (fieldValue(emp.careers_url)) links.push(`<a href="${esc(emp.careers_url)}" target="_blank" rel="noopener">Careers page</a>`);
+  if (fieldValue(emp.website)) {
+    links.push(`<a class="detail-link" href="${esc(emp.website)}" target="_blank" rel="noopener">Website ↗</a>`);
+  }
+  if (fieldValue(emp.careers_url)) {
+    const isJob = emp.is_job_posting || /indeed\.com\/viewjob|linkedin\.com\/jobs/i.test(emp.careers_url);
+    const label = isJob ? "View job posting ↗" : "Careers page ↗";
+    links.push(`<a class="detail-link" href="${esc(emp.careers_url)}" target="_blank" rel="noopener">${label}</a>`);
+  }
+
+  const companyBlock = detailSection("Company", [
+    fieldItem("Sector", emp.sector),
+    fieldItem("Subsector", emp.subsector),
+    fieldItem("Category", emp.employer_category),
+    fieldItem("Stage", emp.company_stage),
+    fieldItem("Scale", emp.company_scale),
+    fieldItem("Source", emp.source),
+    fieldItem("Hiring confidence", emp.hiring_confidence),
+    linkField("Website", emp.website),
+  ].join(""));
+
+  const locationBlock = detailSection("Location", [
+    fieldItem("Country", emp.country),
+    fieldItem("City", emp.city),
+    fieldItem("Region", emp.region),
+    fieldItem("Hiring geography", emp.hiring_geography),
+    fieldItem("Region eligibility", emp.region_eligibility),
+  ].join(""));
+
+  const hiringBlock = detailSection("Hiring", [
+    fieldItem("Target roles", emp.target_roles, true),
+    fieldItem("Tech stack", emp.tech_stack, true),
+    fieldItem("Remote", emp.remote),
+    fieldItem("Language", emp.language_requirement),
+  ].join(""));
+
+  const visaBlock = detailSection("Visa & work authorization", [
+    fieldItem("Visa sponsorship", emp.visa_sponsorship),
+    fieldItem("Sponsor register", emp.visa_sponsor_register),
+    fieldItem("EOR", emp.eor),
+  ].join(""));
+
+  const reason = fieldValue(emp.reason_match);
+  const matchBlock = reason
+    ? `<section class="detail-section"><h4>Why it matched</h4><p class="reason-text">${esc(reason)}</p></section>`
+    : "";
+
+  const scoreHtml = emp.score != null
+    ? `<div class="detail-score-block"><span class="detail-score-label">Match score</span>${scoreBadge(emp.score)}</div>`
+    : "";
+
+  const sections = [renderEnrichmentBlock(enrichment), hiringBlock, companyBlock, locationBlock, visaBlock, matchBlock]
+    .filter(Boolean).join("");
 
   el.innerHTML = `
+    ${qualityBanner(emp)}
     <header class="detail-header">
-      <div>
-        <h3>${esc(emp.company)}</h3>
-        <div class="detail-links">${links.join("") || '<span style="color:var(--fog);font-size:13px">No links on file</span>'}</div>
-      </div>
-      <div class="detail-score">${scoreBadge(emp.score)}</div>
-    </header>
-
-    <section class="detail-section">
-      <h4>Company</h4>
-      <dl class="field-grid">
-        ${fieldItem("Sector", emp.sector)}
-        ${fieldItem("Subsector", emp.subsector)}
-        ${fieldItem("Category", emp.employer_category)}
-        ${fieldItem("Stage", emp.company_stage)}
-        ${fieldItem("Scale", emp.company_scale)}
-        ${fieldItem("Source", emp.source)}
-        ${fieldItem("Hiring confidence", emp.hiring_confidence)}
-      </dl>
-    </section>
-
-    <section class="detail-section">
-      <h4>Location</h4>
-      <dl class="field-grid">
-        ${fieldItem("Country", emp.country)}
-        ${fieldItem("City", emp.city)}
-        ${fieldItem("Region", emp.region)}
-        ${fieldItem("Hiring geography", emp.hiring_geography)}
-        ${fieldItem("Region eligibility", emp.region_eligibility)}
-      </dl>
-    </section>
-
-    <section class="detail-section">
-      <h4>Hiring</h4>
-      <dl class="field-grid">
-        ${fieldItem("Target roles", emp.target_roles, true)}
-        ${fieldItem("Tech stack", emp.tech_stack, true)}
-        ${fieldItem("Remote", emp.remote)}
-        ${fieldItem("Language requirement", emp.language_requirement)}
-      </dl>
-    </section>
-
-    <section class="detail-section">
-      <h4>Visa & work authorization</h4>
-      <dl class="field-grid">
-        ${fieldItem("Visa sponsorship", emp.visa_sponsorship)}
-        ${fieldItem("Visa sponsor register", emp.visa_sponsor_register)}
-        ${fieldItem("EOR", emp.eor)}
-      </dl>
-    </section>
-
-    <section class="detail-section">
-      <h4>Why it matched</h4>
-      <dl class="field-grid">
-        <div class="field-item full">
-          <dt>Reason</dt>
-          <dd class="reason-text">${fieldValue(emp.reason_match) ? esc(emp.reason_match) : "—"}</dd>
+      <div class="detail-header-main">
+        ${companyAvatar(emp.company)}
+        <div>
+          <h3>${esc(emp.company)}</h3>
+          ${loc ? `<p class="detail-loc">${esc(loc)}</p>` : ""}
+          ${chips.length ? `<div class="detail-chips">${chips.join("")}</div>` : ""}
+          ${links.length ? `<div class="detail-links">${links.join("")}</div>` : ""}
         </div>
-      </dl>
-    </section>`;
+      </div>
+      ${scoreHtml}
+    </header>
+    ${sections || `<p class="detail-placeholder">No additional details on file.${emp.can_enrich ? ' Try <strong>Fill from job posting</strong> above.' : ""}</p>`}`;
+}
+
+let employerEnrichment = null;
+
+async function enrichEmployer(btn) {
+  if (!selectedEmployerId) return;
+  await withButton(btn, "Fetching…", async () => {
+    const res = await api(`/api/employers/${selectedEmployerId}/enrich`, { method: "POST" });
+    employerEnrichment = res.enrichment;
+    const emp = employersData.find(e => e.id === selectedEmployerId);
+    if (emp) renderEmployerDetail(emp, employerEnrichment);
+    toast("Pulled data from job posting");
+  });
 }
 
 function renderEmployerQueue(items) {
@@ -187,8 +261,9 @@ function selectEmployer(id) {
     el.classList.toggle("active", on);
     el.setAttribute("aria-selected", on);
   });
+  employerEnrichment = null;
   const emp = employersData.find(e => e.id === id);
-  if (emp) renderEmployerDetail(emp);
+  if (emp) renderEmployerDetail(emp, null);
 }
 
 function showAuthTab(mode) {
@@ -317,10 +392,12 @@ async function loadEmployers(btn) {
   const search = document.getElementById("emp-search").value;
   const region = document.getElementById("emp-region").value;
   const visa = document.getElementById("emp-visa").value;
+  const quality = document.getElementById("emp-quality")?.value || "";
   const params = new URLSearchParams({ page: empPage, limit: 50 });
   if (search) params.set("search", search);
   if (region) params.set("region", region);
   if (visa) params.set("visa", visa);
+  if (quality) params.set("quality", quality);
 
   try {
     const res = await api(`/api/employers?${params}`);

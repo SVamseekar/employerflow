@@ -17,6 +17,8 @@ def is_valid_company(name: str) -> bool:
         return False
     if not re.match(r"^[a-zA-Z0-9]", name):
         return False
+    if re.match(r"^\d{2,}\s", name):
+        return False
 
     lower_name = name.lower()
     junk_patterns = [

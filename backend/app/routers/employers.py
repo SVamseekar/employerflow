@@ -1,13 +1,14 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, or_
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.config import get_settings
 from app.database import get_db
 from app.models import Employer, PlanTier, User, UserProfile
+from app.services.data_quality import classify_employer, enrich_from_job_url
 from app.services.scoring import score_employer
 from app.services.validation import clean_company_name
 
@@ -67,6 +68,7 @@ def _classify_region(emp: Employer) -> str:
 
 
 def _employer_dict(emp: Employer, score: int | None = None) -> dict:
+    quality = classify_employer(emp)
     return {
         "id": emp.id,
         "company": emp.company,
@@ -93,10 +95,20 @@ def _employer_dict(emp: Employer, score: int | None = None) -> dict:
         "visa_sponsor_register": emp.visa_sponsor_register,
         "region": _classify_region(emp),
         "score": score,
+        "data_quality": quality["tier"],
+        "filled_fields": quality["filled_fields"],
+        "is_job_posting": quality["is_job_posting"],
+        "can_enrich": quality["can_enrich"],
     }
 
 
-def _base_query(db: Session, search: Optional[str], region: Optional[str], visa: Optional[str]):
+def _base_query(
+    db: Session,
+    search: Optional[str],
+    region: Optional[str],
+    visa: Optional[str],
+    quality: Optional[str] = None,
+):
     q = db.query(Employer)
 
     if search:
@@ -121,6 +133,26 @@ def _base_query(db: Session, search: Optional[str], region: Optional[str], visa:
         clause = _region_filter(region)
         if clause is not True:
             q = q.filter(clause)
+
+    if quality == "verified":
+        q = q.filter(
+            Employer.website.isnot(None),
+            func.lower(Employer.website) != "unknown",
+            Employer.website != "",
+            ~func.lower(Employer.careers_url).like("%indeed.com/viewjob%"),
+            ~func.lower(Employer.careers_url).like("%linkedin.com/jobs/view%"),
+        )
+    elif quality == "exclude_scrapes":
+        q = q.filter(
+            or_(
+                ~func.lower(Employer.reason_match).like("actively hiring%"),
+                and_(
+                    Employer.website.isnot(None),
+                    func.lower(Employer.website) != "unknown",
+                    Employer.website != "",
+                ),
+            )
+        )
 
     return q
 
@@ -150,10 +182,11 @@ def list_employers(
     search: Optional[str] = None,
     region: Optional[str] = None,
     visa: Optional[str] = None,
+    quality: Optional[str] = None,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    q = _base_query(db, search, region, visa)
+    q = _base_query(db, search, region, visa, quality)
     total = q.count()
 
     if user.plan == PlanTier.free:
@@ -214,3 +247,31 @@ def get_employer(
     emp.company = clean_company_name(emp.company)
     score = score_employer(emp, profile)[0] if can_score and profile else None
     return _employer_dict(emp, score)
+
+
+@router.post("/{employer_id}/enrich")
+def enrich_employer(
+    employer_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if user.plan == PlanTier.free:
+        raise HTTPException(status_code=402, detail="Upgrade to Pro to enrich employer data.")
+
+    emp = db.get(Employer, employer_id)
+    if not emp:
+        raise HTTPException(status_code=404, detail="Employer not found")
+
+    quality = classify_employer(emp)
+    if not quality["can_enrich"]:
+        raise HTTPException(status_code=400, detail="No job posting URL available to enrich from.")
+
+    result = enrich_from_job_url(emp.careers_url, emp)
+    if not result.get("ok"):
+        raise HTTPException(status_code=502, detail=result.get("error", "Failed to fetch job posting"))
+
+    return {
+        "employer_id": employer_id,
+        "current": _employer_dict(emp, None),
+        "enrichment": result,
+    }

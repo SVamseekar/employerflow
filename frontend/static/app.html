@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/style.css?v=ui4">
+  <link rel="stylesheet" href="/static/css/style.css?v=ui5">
 </head>
 <body>
 <div id="global-loader" class="global-loader" aria-hidden="true"></div>
@@ -156,6 +156,14 @@
               <option value="remote">Remote only</option>
             </select>
           </div>
+          <div>
+            <label>Data quality</label>
+            <select id="emp-quality" onchange="empPage=1;loadEmployers()">
+              <option value="">All records</option>
+              <option value="verified">Verified companies only</option>
+              <option value="exclude_scrapes">Hide job listings</option>
+            </select>
+          </div>
           <button class="btn btn-primary" id="btn-emp-search" onclick="empPage=1;loadEmployers(this)">Search</button>
         </div>
         <div class="directory-workspace" id="directory-workspace">
@@ -166,7 +174,7 @@
             <ul id="emp-queue" class="queue-list" role="listbox"></ul>
           </aside>
           <div class="directory-detail" id="emp-detail">
-            <p class="detail-placeholder">Select a company to view all database fields.</p>
+            <p class="detail-placeholder">Select a company to view its profile.</p>
           </div>
         </div>
         <div class="pagination">
@@ -286,7 +294,7 @@
   </div>
 </div>
 
-<script src="/static/js/api.js?v=ui4"></script>
-<script src="/static/js/app.js?v=ui4"></script>
+<script src="/static/js/api.js?v=ui5"></script>
+<script src="/static/js/app.js?v=ui5"></script>
 </body>
 </html>

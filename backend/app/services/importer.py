@@ -4,7 +4,19 @@ import os
 from sqlalchemy.orm import Session
 
 from app.models import Employer
+from app.services.data_quality import is_job_posting_url
 from app.services.validation import clean_company_name, is_valid_company
+
+
+def _is_scrape_row(row: dict) -> bool:
+    website = (row.get("Website") or "").strip()
+    careers = (row.get("Careers_URL") or "").strip()
+    reason = (row.get("Reason_Match") or "").strip()
+    if not is_job_posting_url(careers):
+        return False
+    if website and website.lower() not in ("unknown", "none", "n/a", ""):
+        return False
+    return reason.lower().startswith("actively hiring") or "indeed" in (row.get("Source") or "").lower()
 
 FIELD_MAP = {
     "Company": "company",
@@ -42,7 +54,7 @@ def import_from_csv(db: Session, csv_path: str) -> tuple[int, int]:
     with open(csv_path, encoding="utf-8") as f:
         for row in csv.DictReader(f):
             company = clean_company_name((row.get("Company") or "").strip())
-            if not is_valid_company(company):
+            if not is_valid_company(company) or _is_scrape_row(row):
                 skipped += 1
                 continue
             key = company.lower()
