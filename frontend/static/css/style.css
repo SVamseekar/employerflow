@@ -682,11 +682,219 @@ label { display: block; font-size: 12px; font-weight: 600; color: var(--mist); m
 }
 .locked-panel .lock-icon { font-size: 32px; margin-bottom: 12px; opacity: 0.6; }
 
-.shortlist-layout { display: grid; grid-template-columns: 1fr; gap: 20px; }
-@media (min-width: 1100px) {
-  .shortlist-layout.has-list { grid-template-columns: 1.1fr 1fr; }
+/* Shortlist — queue + editor (outreach inbox pattern) */
+.shortlist-zero {
+  padding: 48px 24px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  max-width: 420px;
 }
-.draft-panel { position: sticky; top: calc(var(--topbar-h) + 16px); }
+.shortlist-zero .zero-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.shortlist-zero .zero-hint {
+  font-size: 14px;
+  color: var(--mist);
+  line-height: 1.5;
+}
+
+.shortlist-workspace {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  min-height: calc(100vh - var(--topbar-h) - 80px);
+  max-height: calc(100vh - var(--topbar-h) - 80px);
+  overflow: hidden;
+}
+
+.shortlist-queue {
+  width: 280px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--elevated);
+}
+
+.queue-toolbar {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.queue-count {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fog);
+  margin-bottom: 8px;
+}
+.queue-search {
+  font-size: 13px;
+  padding: 8px 10px;
+}
+
+.queue-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.queue-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 12px;
+  border: none;
+  border-bottom: 1px solid var(--line-soft);
+  background: transparent;
+  color: var(--snow);
+  font-family: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background .1s;
+}
+.queue-item:hover { background: rgba(255, 255, 255, 0.03); }
+.queue-item.active {
+  background: var(--paper);
+  box-shadow: inset 2px 0 0 var(--copper);
+}
+.queue-item .q-score {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fog);
+  width: 26px;
+  flex-shrink: 0;
+  text-align: right;
+}
+.queue-item.active .q-score { color: var(--copper); }
+.queue-item .q-info { min-width: 0; flex: 1; }
+.queue-item .q-name {
+  display: block;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.queue-item .q-loc {
+  display: block;
+  font-size: 11px;
+  color: var(--fog);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.queue-empty {
+  padding: 20px 14px;
+  font-size: 13px;
+  color: var(--fog);
+}
+
+.shortlist-editor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.editor-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.editor-heading h3 {
+  font-family: var(--font);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.editor-meta {
+  font-size: 13px;
+  color: var(--mist);
+  margin-top: 4px;
+}
+.editor-notes {
+  font-size: 12px;
+  color: var(--fog);
+  margin-top: 8px;
+  line-height: 1.45;
+  max-width: 560px;
+}
+
+.editor-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--line-soft);
+  flex-shrink: 0;
+}
+.editor-row label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fog);
+  margin-bottom: 5px;
+}
+
+.editor-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 14px 20px 20px;
+}
+.editor-body label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fog);
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+.editor-body textarea {
+  flex: 1;
+  min-height: 200px;
+  font-size: 14px;
+  line-height: 1.55;
+  resize: none;
+  font-family: var(--font);
+}
+
+@media (max-width: 900px) {
+  .shortlist-workspace {
+    flex-direction: column;
+    max-height: none;
+    min-height: 0;
+  }
+  .shortlist-queue {
+    width: 100%;
+    max-height: 220px;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+  }
+  .editor-fields { grid-template-columns: 1fr; }
+}
 
 /* Auth */
 .auth-screen {

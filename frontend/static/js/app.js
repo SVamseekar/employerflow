@@ -296,11 +296,50 @@ async function generateShortlist(btn) {
   });
 }
 
+function renderShortlistQueue(items) {
+  const list = document.getElementById("sl-queue");
+  const count = document.getElementById("sl-count");
+  if (!list) return;
+
+  if (count) {
+    const total = shortlistData.length;
+    count.textContent = items.length === total
+      ? `${total} companies`
+      : `${items.length} of ${total}`;
+  }
+
+  if (!items.length) {
+    list.innerHTML = `<li class="queue-empty">No matches for this filter</li>`;
+    return;
+  }
+
+  list.innerHTML = items.map(item => `
+    <li>
+      <button type="button" class="queue-item${item.id === selectedShortlistId ? " active" : ""}"
+        data-id="${item.id}" onclick="selectShortlist(${item.id})" role="option"
+        aria-selected="${item.id === selectedShortlistId}">
+        <span class="q-score">${item.score}</span>
+        <span class="q-info">
+          <span class="q-name">${esc(item.employer.company)}</span>
+          <span class="q-loc">${esc(item.employer.country)}${item.employer.sector ? " · " + esc(item.employer.sector) : ""}</span>
+        </span>
+      </button>
+    </li>`).join("");
+}
+
+function filterShortlistQueue() {
+  const q = (document.getElementById("sl-filter")?.value || "").toLowerCase().trim();
+  const filtered = !q ? shortlistData : shortlistData.filter(item => {
+    const blob = `${item.employer.company} ${item.employer.country} ${item.employer.sector} ${item.match_notes}`.toLowerCase();
+    return blob.includes(q);
+  });
+  renderShortlistQueue(filtered);
+}
+
 async function loadShortlist() {
   setViewLoading("view-shortlist", true);
-  const tbody = document.getElementById("sl-tbody");
-  const layout = document.getElementById("shortlist-detail");
-  if (tbody) tbody.innerHTML = loadingTableRow(5, "Loading shortlist…");
+  const queue = document.getElementById("sl-queue");
+  if (queue) queue.innerHTML = `<li class="queue-empty">Loading…</li>`;
 
   try {
     shortlistData = await api("/api/shortlist");
@@ -321,42 +360,46 @@ async function loadShortlist() {
 
   document.getElementById("shortlist-empty").classList.add("hidden");
   document.getElementById("shortlist-detail").classList.remove("hidden");
-  if (layout) layout.classList.add("has-list");
 
-  document.getElementById("sl-tbody").innerHTML = shortlistData.map(item => `
-    <tr data-id="${item.id}" class="${item.id === selectedShortlistId ? "row-active" : ""}">
-      <td>${scoreBadge(item.score)}</td>
-      <td>
-        <div class="company-cell">
-          ${companyAvatar(item.employer.company)}
-          <div class="company-name">${esc(item.employer.company)}</div>
-        </div>
-      </td>
-      <td>${esc(item.employer.country)}</td>
-      <td style="font-size:12px;color:var(--mist);max-width:200px">${esc(item.match_notes)}</td>
-      <td><button class="btn btn-ghost btn-sm" onclick="selectShortlist(${item.id}, this)">Open</button></td>
-    </tr>`).join("");
+  const filterEl = document.getElementById("sl-filter");
+  if (filterEl) filterEl.value = "";
+  renderShortlistQueue(shortlistData);
 
-  if (!selectedShortlistId) selectShortlist(shortlistData[0].id);
+  const stillSelected = shortlistData.some(s => s.id === selectedShortlistId);
+  if (!stillSelected) selectedShortlistId = null;
+  if (!selectedShortlistId) await selectShortlist(shortlistData[0].id);
+  else await selectShortlist(selectedShortlistId);
 }
 
-async function selectShortlist(id, btn) {
+async function selectShortlist(id) {
   selectedShortlistId = id;
-  document.querySelectorAll("#sl-tbody tr").forEach(tr => {
-    tr.classList.toggle("row-active", Number(tr.dataset.id) === id);
+  document.querySelectorAll(".queue-item").forEach(el => {
+    const on = Number(el.dataset.id) === id;
+    el.classList.toggle("active", on);
+    el.setAttribute("aria-selected", on);
   });
 
   const summary = shortlistData.find(s => s.id === id);
   if (!summary) return;
 
-  if (btn) setButtonLoading(btn, true, "Loading…");
+  const notesEl = document.getElementById("sl-notes");
   document.getElementById("sl-company").textContent = summary.employer.company;
   document.getElementById("sl-meta").textContent =
-    `${summary.employer.sector} · ${summary.employer.country} · Score ${summary.score}`;
+    [summary.employer.sector, summary.employer.country].filter(Boolean).join(" · ");
+  if (notesEl) {
+    if (summary.match_notes) {
+      notesEl.textContent = summary.match_notes;
+      notesEl.classList.remove("hidden");
+    } else {
+      notesEl.textContent = "";
+      notesEl.classList.add("hidden");
+    }
+  }
+
   document.getElementById("sl-to").value = summary.to_email || "";
   document.getElementById("sl-job").value = summary.job_url || "";
   document.getElementById("sl-draft").value = "";
-  document.getElementById("sl-draft").placeholder = "Loading draft…";
+  document.getElementById("sl-draft").placeholder = "Loading…";
 
   try {
     const item = await api(`/api/shortlist/${id}`);
@@ -367,14 +410,13 @@ async function selectShortlist(id, btn) {
     const idx = shortlistData.findIndex(s => s.id === id);
     if (idx >= 0) shortlistData[idx] = { ...shortlistData[idx], ...item };
   } catch (err) {
-    document.getElementById("sl-draft").placeholder = "";
+    document.getElementById("sl-draft").placeholder = "Could not load draft";
     toast(err.message, true);
-  } finally {
-    if (btn) setButtonLoading(btn, false);
   }
 }
 
 async function saveShortlistItem(btn) {
+  if (!selectedShortlistId) return;
   await withButton(btn, "Saving…", async () => {
     await api(`/api/shortlist/${selectedShortlistId}`, {
       method: "PUT",
@@ -384,8 +426,12 @@ async function saveShortlistItem(btn) {
         email_draft: document.getElementById("sl-draft").value,
       }),
     });
+    const idx = shortlistData.findIndex(s => s.id === selectedShortlistId);
+    if (idx >= 0) {
+      shortlistData[idx].to_email = document.getElementById("sl-to").value;
+      shortlistData[idx].job_url = document.getElementById("sl-job").value;
+    }
     toast("Draft saved");
-    await loadShortlist();
   });
 }
 

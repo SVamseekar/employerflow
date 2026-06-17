@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/style.css?v=ui2">
+  <link rel="stylesheet" href="/static/css/style.css?v=ui3">
 </head>
 <body>
 <div id="global-loader" class="global-loader" aria-hidden="true"></div>
@@ -199,34 +199,41 @@
       </section>
 
       <section id="view-shortlist" class="view hidden">
-        <div id="shortlist-empty" class="panel hidden">
-          <div class="empty-state">
-            <div class="empty-icon">✉️</div>
-            <h3>No shortlist yet</h3>
-            <p>Complete your profile, then generate a ranked list of employers with personalized email drafts.</p>
-            <button class="btn btn-primary" onclick="generateShortlist(document.getElementById('btn-generate-shortlist'))">Generate shortlist</button>
-          </div>
+        <div id="shortlist-empty" class="shortlist-zero hidden">
+          <p class="zero-title">No companies shortlisted</p>
+          <p class="zero-hint">Add skills to your profile, then use <strong>Generate shortlist</strong> in the header.</p>
         </div>
-        <div id="shortlist-detail" class="hidden shortlist-layout">
-          <div class="draft-panel panel">
-            <div class="panel-header">
-              <div>
-                <h3 id="sl-company">—</h3>
-                <p class="panel-desc" id="sl-meta"></p>
+        <div id="shortlist-detail" class="shortlist-workspace hidden">
+          <aside class="shortlist-queue">
+            <div class="queue-toolbar">
+              <span class="queue-count" id="sl-count"></span>
+              <input type="search" id="sl-filter" class="queue-search" placeholder="Filter companies…" oninput="filterShortlistQueue()">
+            </div>
+            <ul id="sl-queue" class="queue-list" role="listbox"></ul>
+          </aside>
+          <div class="shortlist-editor">
+            <header class="editor-header">
+              <div class="editor-heading">
+                <h3 id="sl-company">Select a company</h3>
+                <p id="sl-meta" class="editor-meta"></p>
+                <p id="sl-notes" class="editor-notes hidden"></p>
               </div>
-              <button class="btn btn-success btn-sm" id="btn-save-draft" onclick="saveShortlistItem(this)">Save draft</button>
+              <button type="button" class="btn btn-primary btn-sm" id="btn-save-draft" onclick="saveShortlistItem(this)">Save draft</button>
+            </header>
+            <div class="editor-fields">
+              <div class="editor-row">
+                <label for="sl-to">To</label>
+                <input id="sl-to" type="email" placeholder="careers@company.com" autocomplete="off">
+              </div>
+              <div class="editor-row">
+                <label for="sl-job">Job link</label>
+                <input id="sl-job" type="url" placeholder="https://" autocomplete="off">
+              </div>
             </div>
-            <div class="form-grid">
-              <div><label>To email</label><input id="sl-to" placeholder="careers@company.com"></div>
-              <div><label>Job URL</label><input id="sl-job" placeholder="https://…"></div>
-              <div class="full"><label>Email draft</label><textarea id="sl-draft" rows="16" placeholder="Your personalized outreach email…"></textarea></div>
+            <div class="editor-body">
+              <label for="sl-draft">Message</label>
+              <textarea id="sl-draft" placeholder="Pick a company from the queue to load its draft." spellcheck="true"></textarea>
             </div>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th>Score</th><th>Company</th><th>Country</th><th>Match notes</th><th></th></tr></thead>
-              <tbody id="sl-tbody"></tbody>
-            </table>
           </div>
         </div>
       </section>
@@ -274,7 +281,7 @@
   </div>
 </div>
 
-<script src="/static/js/api.js?v=ui2"></script>
-<script src="/static/js/app.js?v=ui2"></script>
+<script src="/static/js/api.js?v=ui3"></script>
+<script src="/static/js/app.js?v=ui3"></script>
 </body>
 </html>
