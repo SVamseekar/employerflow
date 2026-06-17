@@ -24,7 +24,7 @@ function logout() {
   window.location.href = "/";
 }
 
-async function api(path, opts = {}) {
+async function api(path, opts = {}, retries = 0) {
   const headers = { "Content-Type": "application/json", ...(opts.headers || {}) };
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -36,7 +36,18 @@ async function api(path, opts = {}) {
     logout();
     throw new Error("Session expired");
   }
-  if (!res.ok) throw new Error(data.detail || data.message || `Error ${res.status}`);
+  if (!res.ok) {
+    const retryable = [404, 502, 503, 504].includes(res.status);
+    if (retryable && retries < 2) {
+      await new Promise(r => setTimeout(r, 4000));
+      return api(path, opts, retries + 1);
+    }
+    const detail = data.detail || data.message || `Error ${res.status}`;
+    if (res.status === 404) {
+      throw new Error("Service is waking up — please try again in a few seconds.");
+    }
+    throw new Error(detail);
+  }
   return data;
 }
 

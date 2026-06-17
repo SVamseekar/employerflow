@@ -144,13 +144,19 @@ async function saveProfile() {
 }
 
 async function generateShortlist() {
+  const btn = document.querySelector("#view-shortlist .btn-primary");
+  const prev = btn?.textContent;
+  if (btn) { btn.disabled = true; btn.textContent = "Generating…"; }
   try {
     const res = await api("/api/shortlist/generate", { method: "POST" });
     toast(`Generated ${res.generated} companies`);
-    loadShortlist();
+    selectedShortlistId = null;
+    await loadShortlist();
   } catch (err) {
     toast(err.message, true);
     if (err.message.includes("402") || err.message.includes("pro plan")) switchView("billing");
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = prev || "Generate Shortlist"; }
   }
 }
 
@@ -184,16 +190,27 @@ async function loadShortlist() {
   if (!selectedShortlistId) selectShortlist(shortlistData[0].id);
 }
 
-function selectShortlist(id) {
+async function selectShortlist(id) {
   selectedShortlistId = id;
-  const item = shortlistData.find(s => s.id === id);
-  if (!item) return;
-  document.getElementById("sl-company").textContent = item.employer.company;
+  const summary = shortlistData.find(s => s.id === id);
+  if (!summary) return;
+  document.getElementById("sl-company").textContent = summary.employer.company;
   document.getElementById("sl-meta").textContent =
-    `${item.employer.sector} · ${item.employer.country} · Score ${item.score} · ${item.match_notes}`;
-  document.getElementById("sl-to").value = item.to_email;
-  document.getElementById("sl-job").value = item.job_url;
-  document.getElementById("sl-draft").value = item.email_draft;
+    `${summary.employer.sector} · ${summary.employer.country} · Score ${summary.score} · ${summary.match_notes}`;
+  document.getElementById("sl-to").value = summary.to_email || "";
+  document.getElementById("sl-job").value = summary.job_url || "";
+  document.getElementById("sl-draft").value = "Loading draft…";
+  try {
+    const item = await api(`/api/shortlist/${id}`);
+    document.getElementById("sl-to").value = item.to_email || "";
+    document.getElementById("sl-job").value = item.job_url || "";
+    document.getElementById("sl-draft").value = item.email_draft || "";
+    const idx = shortlistData.findIndex(s => s.id === id);
+    if (idx >= 0) shortlistData[idx] = { ...shortlistData[idx], ...item };
+  } catch (err) {
+    document.getElementById("sl-draft").value = "";
+    toast(err.message, true);
+  }
 }
 
 async function saveShortlistItem() {

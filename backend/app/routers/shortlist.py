@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.auth import get_current_user, require_plan
 from app.config import get_settings
@@ -19,6 +19,35 @@ def _limit_for_plan(plan: PlanTier) -> int:
     return settings.pro_shortlist_limit
 
 
+def _employer_dict(emp: Employer) -> dict:
+    return {
+        "id": emp.id,
+        "company": emp.company,
+        "sector": emp.sector,
+        "country": emp.country,
+        "tech_stack": emp.tech_stack,
+        "visa_sponsorship": emp.visa_sponsorship,
+        "careers_url": emp.careers_url,
+        "website": emp.website,
+    }
+
+
+def _item_dict(item: ShortlistItem, *, include_draft: bool) -> dict:
+    data = {
+        "id": item.id,
+        "score": item.score,
+        "match_notes": item.match_notes,
+        "to_email": item.to_email,
+        "job_url": item.job_url,
+        "outreach_status": item.outreach_status,
+        "sent_at": item.sent_at.isoformat() if item.sent_at else None,
+        "employer": _employer_dict(item.employer),
+    }
+    if include_draft:
+        data["email_draft"] = item.email_draft
+    return data
+
+
 @router.post("/generate")
 def generate_shortlist(
     user: User = Depends(require_plan(PlanTier.pro)),
@@ -34,55 +63,51 @@ def generate_shortlist(
 
     db.query(ShortlistItem).filter(ShortlistItem.user_id == user.id).delete()
 
+    items = []
     for item in scored:
         emp = item["employer"]
-        draft = generate_email(user, profile, emp)
-        db.add(ShortlistItem(
+        items.append(ShortlistItem(
             user_id=user.id,
             employer_id=emp.id,
             score=item["score"],
             match_notes=item["match_notes"],
-            email_draft=draft,
+            email_draft=generate_email(user, profile, emp),
             to_email=guess_to_email(emp.company, emp.website),
             job_url=emp.careers_url,
         ))
+    db.bulk_save_objects(items)
     db.commit()
 
     return {"generated": len(scored), "limit": limit}
 
 
-@router.get("")
+@router.get("/")
 def get_shortlist(user: User = Depends(require_plan(PlanTier.pro)), db: Session = Depends(get_db)):
     items = (
         db.query(ShortlistItem)
+        .options(joinedload(ShortlistItem.employer))
         .filter(ShortlistItem.user_id == user.id)
         .order_by(ShortlistItem.score.desc())
         .all()
     )
-    result = []
-    for item in items:
-        emp = item.employer
-        result.append({
-            "id": item.id,
-            "score": item.score,
-            "match_notes": item.match_notes,
-            "email_draft": item.email_draft,
-            "to_email": item.to_email,
-            "job_url": item.job_url,
-            "outreach_status": item.outreach_status,
-            "sent_at": item.sent_at.isoformat() if item.sent_at else None,
-            "employer": {
-                "id": emp.id,
-                "company": emp.company,
-                "sector": emp.sector,
-                "country": emp.country,
-                "tech_stack": emp.tech_stack,
-                "visa_sponsorship": emp.visa_sponsorship,
-                "careers_url": emp.careers_url,
-                "website": emp.website,
-            },
-        })
-    return result
+    return [_item_dict(item, include_draft=False) for item in items]
+
+
+@router.get("/{item_id}")
+def get_shortlist_item(
+    item_id: int,
+    user: User = Depends(require_plan(PlanTier.pro)),
+    db: Session = Depends(get_db),
+):
+    item = (
+        db.query(ShortlistItem)
+        .options(joinedload(ShortlistItem.employer))
+        .filter(ShortlistItem.id == item_id, ShortlistItem.user_id == user.id)
+        .first()
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Shortlist item not found")
+    return _item_dict(item, include_draft=True)
 
 
 @router.put("/{item_id}")
