@@ -4,12 +4,75 @@ let shortlistData = [];
 let selectedShortlistId = null;
 let activeView = "dashboard";
 
+const PAGE_META = {
+  dashboard: { eyebrow: "Overview", title: "Dashboard" },
+  directory: { eyebrow: "Discovery", title: "Employer directory" },
+  profile: { eyebrow: "Your data", title: "Profile" },
+  shortlist: { eyebrow: "Pipeline", title: "Shortlist & outreach" },
+  crm: { eyebrow: "Tracking", title: "Application CRM" },
+  billing: { eyebrow: "Account", title: "Billing" },
+};
+
+function setPageMeta(name) {
+  const meta = PAGE_META[name] || PAGE_META.dashboard;
+  const eyebrow = document.getElementById("page-eyebrow");
+  const title = document.getElementById("page-title");
+  const actions = document.getElementById("topbar-actions");
+  if (eyebrow) eyebrow.textContent = meta.eyebrow;
+  if (title) title.textContent = meta.title;
+  if (actions) {
+    if (name === "shortlist") {
+      actions.innerHTML = `<button class="btn btn-primary btn-sm" id="btn-generate-shortlist" onclick="generateShortlist(this)">Generate shortlist</button>`;
+    } else if (name === "profile") {
+      actions.innerHTML = `<button class="btn btn-primary btn-sm" id="btn-save-profile-top" onclick="saveProfile(this)">Save changes</button>`;
+    } else {
+      actions.innerHTML = "";
+    }
+  }
+}
+
+function updatePlanPill(plan) {
+  const el = document.getElementById("user-plan");
+  if (!el) return;
+  el.textContent = plan || "free";
+  el.className = "plan-pill" + (plan === "premium" ? " premium" : plan === "pro" ? " pro" : "");
+}
+
+function companyAvatar(name) {
+  const parts = String(name || "?").trim().split(/\s+/);
+  const initials = parts.length >= 2
+    ? (parts[0][0] + parts[1][0]).toUpperCase()
+    : String(name || "?").slice(0, 2).toUpperCase();
+  return `<span class="avatar">${esc(initials)}</span>`;
+}
+
+function visaPill(status) {
+  const s = String(status || "unknown").toLowerCase();
+  let cls = "visa-unknown";
+  if (s === "yes") cls = "visa-yes";
+  else if (s === "possible") cls = "visa-possible";
+  else if (s === "no") cls = "visa-no";
+  const label = s === "yes" ? "Confirmed" : s === "possible" ? "Possible" : status || "Unknown";
+  return `<span class="visa-pill ${cls}">${esc(label)}</span>`;
+}
+
+function scoreBadge(score) {
+  if (score == null) return '<span class="status-pill">Pro+</span>';
+  const n = Number(score);
+  const cls = n >= 60 ? "score-high" : n >= 35 ? "score-mid" : "score-low";
+  return `<span class="score-badge ${cls}">${n}</span>`;
+}
+
 function showAuthTab(mode) {
   authMode = mode;
   document.getElementById("tab-login").classList.toggle("active", mode === "login");
   document.getElementById("tab-register").classList.toggle("active", mode === "register");
   document.getElementById("name-field").style.display = mode === "register" ? "block" : "none";
-  document.getElementById("auth-submit").textContent = mode === "register" ? "Create Account" : "Sign In";
+  document.getElementById("auth-submit").textContent = mode === "register" ? "Create account" : "Sign in";
+  const h2 = document.querySelector(".auth-card h2");
+  const sub = document.querySelector(".auth-card .subtitle");
+  if (h2) h2.textContent = mode === "register" ? "Create your account" : "Welcome back";
+  if (sub) sub.textContent = mode === "register" ? "Start discovering visa-friendly employers" : "Sign in to continue your search";
   document.getElementById("auth-error").classList.add("hidden");
 }
 
@@ -18,15 +81,13 @@ async function handleAuth(e) {
   const btn = document.getElementById("auth-submit");
   const errEl = document.getElementById("auth-error");
   errEl.classList.add("hidden");
-  const email = document.getElementById("email").value;
-  const password = document.getElementById("password").value;
 
   await withButton(btn, authMode === "register" ? "Creating account…" : "Signing in…", async () => {
     try {
       const path = authMode === "register" ? "/api/auth/register" : "/api/auth/login";
       const body = authMode === "register"
-        ? { email, password, full_name: document.getElementById("full-name").value }
-        : { email, password };
+        ? { email: document.getElementById("email").value, password: document.getElementById("password").value, full_name: document.getElementById("full-name").value }
+        : { email: document.getElementById("email").value, password: document.getElementById("password").value };
       const data = await api(path, { method: "POST", body: JSON.stringify(body) });
       setSession(data);
       toast(authMode === "register" ? "Account created — welcome!" : "Signed in");
@@ -41,9 +102,9 @@ async function handleAuth(e) {
 
 function switchView(name) {
   activeView = name;
+  setPageMeta(name);
   document.querySelectorAll(".view").forEach(v => v.classList.add("hidden"));
-  const view = document.getElementById(`view-${name}`);
-  view.classList.remove("hidden");
+  document.getElementById(`view-${name}`).classList.remove("hidden");
   document.querySelectorAll(".nav-item").forEach(n => {
     n.classList.toggle("active", n.dataset.view === name);
     n.classList.remove("is-loading");
@@ -62,7 +123,7 @@ async function initApp() {
   document.getElementById("app-shell").classList.remove("hidden");
   const user = getUser();
   document.getElementById("user-email").textContent = user.email || "";
-  document.getElementById("user-plan").textContent = user.plan || "free";
+  updatePlanPill(user.plan || "free");
 
   setViewLoading("view-dashboard", true);
   document.getElementById("dash-stats").innerHTML = skeletonStats();
@@ -71,14 +132,14 @@ async function initApp() {
     const u = getUser();
     u.plan = me.plan;
     localStorage.setItem("ef_user", JSON.stringify(u));
-    document.getElementById("user-plan").textContent = me.plan;
+    updatePlanPill(me.plan);
   } finally {
     setViewLoading("view-dashboard", false);
   }
 
   if (location.hash === "#register") showAuthTab("register");
   if (new URLSearchParams(location.search).get("billing") === "success") {
-    toast("Payment successful! Your plan is updating.");
+    toast("Payment successful — your plan is updating.");
   }
   switchView("dashboard");
 }
@@ -88,11 +149,24 @@ async function loadDashboard() {
   document.getElementById("dash-stats").innerHTML = skeletonStats();
   try {
     const stats = await api("/api/employers/stats");
+    const plan = getUser().plan || "free";
     document.getElementById("dash-stats").innerHTML = `
-      <div class="stat-card"><div class="label">Total employers</div><div class="value">${stats.total.toLocaleString()}</div></div>
-      <div class="stat-card"><div class="label">Visa confirmed</div><div class="value">${stats.visa_confirmed.toLocaleString()}</div></div>
-      <div class="stat-card"><div class="label">Remote-friendly</div><div class="value">${stats.remote.toLocaleString()}</div></div>
-      <div class="stat-card"><div class="label">Your plan</div><div class="value" style="font-size:1.2rem;text-transform:uppercase">${getUser().plan}</div></div>`;
+      <div class="stat-card">
+        <div class="label">Total employers</div>
+        <div class="value">${stats.total.toLocaleString()}</div>
+      </div>
+      <div class="stat-card accent-teal">
+        <div class="label">Visa confirmed</div>
+        <div class="value">${stats.visa_confirmed.toLocaleString()}</div>
+      </div>
+      <div class="stat-card accent-signal">
+        <div class="label">Remote-friendly</div>
+        <div class="value">${stats.remote.toLocaleString()}</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Your plan</div>
+        <div class="value text-plan">${esc(plan)}</div>
+      </div>`;
   } catch (err) {
     document.getElementById("dash-stats").innerHTML =
       `<div class="stat-card" style="grid-column:1/-1;color:var(--danger)">${esc(err.message)}</div>`;
@@ -106,7 +180,7 @@ async function loadEmployers(btn) {
   const tbody = document.getElementById("emp-tbody");
   const pageInfo = document.getElementById("emp-page-info");
   setViewLoading("view-directory", true);
-  if (btn) setButtonLoading(btn, true, btn.id === "btn-emp-prev" ? "Loading…" : btn.id === "btn-emp-next" ? "Loading…" : "Searching…");
+  if (btn) setButtonLoading(btn, true, "Loading…");
   tbody.innerHTML = loadingTableRow(5, "Loading employers…");
   pageInfo.textContent = "Loading…";
 
@@ -121,19 +195,31 @@ async function loadEmployers(btn) {
   try {
     const res = await api(`/api/employers?${params}`);
     if (!res.data.length) {
-      tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted);padding:16px">No employers found. Try clearing filters.</td></tr>';
+      tbody.innerHTML = `<tr><td colspan="5">
+        <div class="empty-state" style="padding:32px">
+          <div class="empty-icon">🔍</div>
+          <h3>No employers found</h3>
+          <p>Try clearing filters or broadening your search.</p>
+        </div></td></tr>`;
     } else {
       tbody.innerHTML = res.data.map(e => `
         <tr>
-          <td><strong>${esc(e.company)}</strong></td>
+          <td>
+            <div class="company-cell">
+              ${companyAvatar(e.company)}
+              <div>
+                <div class="company-name">${esc(e.company)}</div>
+                <div class="company-sub">${esc(e.region || "")}</div>
+              </div>
+            </div>
+          </td>
           <td>${esc(e.sector)}</td>
           <td>${esc(e.country)}</td>
-          <td>${esc(e.visa_sponsorship)}</td>
-          <td>${e.score != null ? `<span class="score-badge">${e.score}</span>` : '<span style="color:var(--muted)">Pro+</span>'}</td>
+          <td>${visaPill(e.visa_sponsorship)}</td>
+          <td>${scoreBadge(e.score)}</td>
         </tr>`).join("");
     }
-    pageInfo.textContent =
-      `Page ${res.page} · ${res.total.toLocaleString()} results · Plan: ${res.plan}${!res.scoring_enabled ? " (upgrade for scores)" : ""}`;
+    pageInfo.textContent = `Page ${res.page} · ${res.total.toLocaleString()} results · ${res.plan}${!res.scoring_enabled ? " · upgrade for scores" : ""}`;
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="5" style="color:var(--danger);padding:16px">${esc(err.message)}</td></tr>`;
     pageInfo.textContent = "Failed to load";
@@ -156,7 +242,6 @@ async function loadProfile() {
     document.getElementById("p-stack").value = p.stack_highlight || "";
     document.getElementById("p-summary").value = p.summary || "";
     document.getElementById("p-roles").value = (p.role_targets || []).join(", ");
-
     const skills = Array.isArray(p.skills) ? p.skills : Object.values(p.skills || {}).flat();
     document.getElementById("p-skills").value = skills.join(", ");
     document.getElementById("p-projects").value = JSON.stringify(p.projects || [], null, 2);
@@ -214,6 +299,7 @@ async function generateShortlist(btn) {
 async function loadShortlist() {
   setViewLoading("view-shortlist", true);
   const tbody = document.getElementById("sl-tbody");
+  const layout = document.getElementById("shortlist-detail");
   if (tbody) tbody.innerHTML = loadingTableRow(5, "Loading shortlist…");
 
   try {
@@ -235,14 +321,20 @@ async function loadShortlist() {
 
   document.getElementById("shortlist-empty").classList.add("hidden");
   document.getElementById("shortlist-detail").classList.remove("hidden");
+  if (layout) layout.classList.add("has-list");
 
   document.getElementById("sl-tbody").innerHTML = shortlistData.map(item => `
-    <tr>
-      <td><span class="score-badge">${item.score}</span></td>
-      <td>${esc(item.employer.company)}</td>
+    <tr data-id="${item.id}" class="${item.id === selectedShortlistId ? "row-active" : ""}">
+      <td>${scoreBadge(item.score)}</td>
+      <td>
+        <div class="company-cell">
+          ${companyAvatar(item.employer.company)}
+          <div class="company-name">${esc(item.employer.company)}</div>
+        </div>
+      </td>
       <td>${esc(item.employer.country)}</td>
-      <td style="font-size:12px;color:var(--muted)">${esc(item.match_notes)}</td>
-      <td><button class="btn btn-ghost" style="padding:4px 10px;font-size:12px" onclick="selectShortlist(${item.id}, this)">Edit</button></td>
+      <td style="font-size:12px;color:var(--mist);max-width:200px">${esc(item.match_notes)}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="selectShortlist(${item.id}, this)">Open</button></td>
     </tr>`).join("");
 
   if (!selectedShortlistId) selectShortlist(shortlistData[0].id);
@@ -250,13 +342,17 @@ async function loadShortlist() {
 
 async function selectShortlist(id, btn) {
   selectedShortlistId = id;
+  document.querySelectorAll("#sl-tbody tr").forEach(tr => {
+    tr.classList.toggle("row-active", Number(tr.dataset.id) === id);
+  });
+
   const summary = shortlistData.find(s => s.id === id);
   if (!summary) return;
 
   if (btn) setButtonLoading(btn, true, "Loading…");
   document.getElementById("sl-company").textContent = summary.employer.company;
   document.getElementById("sl-meta").textContent =
-    `${summary.employer.sector} · ${summary.employer.country} · Score ${summary.score} · ${summary.match_notes}`;
+    `${summary.employer.sector} · ${summary.employer.country} · Score ${summary.score}`;
   document.getElementById("sl-to").value = summary.to_email || "";
   document.getElementById("sl-job").value = summary.job_url || "";
   document.getElementById("sl-draft").value = "";
@@ -308,16 +404,18 @@ async function loadCRM() {
   try {
     const apps = await api("/api/applications");
     if (!apps.length) {
-      document.getElementById("crm-tbody").innerHTML =
-        '<tr><td colspan="5" style="color:var(--muted);padding:16px">No applications yet.</td></tr>';
+      document.getElementById("crm-tbody").innerHTML = `<tr><td colspan="5">
+        <div class="empty-state" style="padding:28px">
+          <p style="color:var(--mist)">No applications tracked yet. Add your first one above.</p>
+        </div></td></tr>`;
     } else {
       document.getElementById("crm-tbody").innerHTML = apps.map(a => `
         <tr>
-          <td>${esc(a.company)}</td>
+          <td><div class="company-cell">${companyAvatar(a.company)}<span class="company-name">${esc(a.company)}</span></div></td>
           <td>${esc(a.role)}</td>
-          <td>${esc(a.status)}</td>
-          <td>${esc(a.follow_up_date)}</td>
-          <td style="font-size:12px">${esc(a.notes)}</td>
+          <td><span class="status-pill">${esc(a.status)}</span></td>
+          <td style="font-family:var(--mono);font-size:12px">${esc(a.follow_up_date) || "—"}</td>
+          <td style="font-size:12px;color:var(--mist)">${esc(a.notes)}</td>
         </tr>`).join("");
     }
   } catch (err) {
@@ -342,31 +440,35 @@ async function addApplication(btn) {
       }),
     });
     toast("Application added");
+    document.getElementById("crm-company").value = "";
+    document.getElementById("crm-role").value = "";
+    document.getElementById("crm-notes").value = "";
     await loadCRM();
   });
 }
 
 async function loadBilling() {
   setViewLoading("view-billing", true);
-  document.getElementById("billing-plans").innerHTML = `
-    <div class="price-card"><div class="skeleton-line" style="width:40%;margin-bottom:12px"></div>
-    <div class="skeleton-line" style="width:60%;height:28px;margin-bottom:16px"></div>
-    <div class="skeleton-line" style="width:80%"></div></div>`.repeat(3);
+  document.getElementById("billing-plans").innerHTML =
+    `<div class="price-card"><div class="skeleton-line" style="width:40%;margin-bottom:12px"></div>
+     <div class="skeleton-line" style="width:60%;height:28px;margin-bottom:16px"></div>
+     <div class="skeleton-line" style="width:80%"></div></div>`.repeat(3);
   try {
     const { plans } = await api("/api/billing/plans");
     const current = getUser().plan;
     document.getElementById("billing-plans").innerHTML = plans.map(p => `
-      <div class="price-card ${p.id === 'pro' ? 'featured' : ''}">
-        <h3>${p.name} ${p.id === current ? '<span style="font-size:12px;color:var(--accent2)">(current)</span>' : ''}</h3>
+      <div class="price-card ${p.id === "pro" ? "featured" : ""}">
+        <h3>${p.name} ${p.id === current ? '<span style="font-size:11px;color:var(--teal);font-weight:600"> · current</span>' : ""}</h3>
         <div class="price">$${p.price} <span>/ month</span></div>
         <ul>${p.features.map(f => `<li>${f}</li>`).join("")}</ul>
         ${p.id !== "free" && p.id !== current
           ? `<button class="btn btn-primary" style="width:100%" onclick="checkout('${p.id}', this)">Subscribe</button>`
-          : p.id === "free" ? `<span style="color:var(--muted);font-size:13px">Default plan</span>` : `<span style="color:var(--accent2);font-size:13px">Active</span>`}
+          : p.id === "free"
+            ? `<span style="color:var(--mist);font-size:13px">Default plan</span>`
+            : `<span style="color:var(--teal);font-size:13px;font-weight:600">Active on your account</span>`}
       </div>`).join("");
   } catch (err) {
-    document.getElementById("billing-plans").innerHTML =
-      `<p style="color:var(--danger)">${esc(err.message)}</p>`;
+    document.getElementById("billing-plans").innerHTML = `<p style="color:var(--danger)">${esc(err.message)}</p>`;
     toast(err.message, true);
   } finally {
     setViewLoading("view-billing", false);
@@ -403,7 +505,6 @@ function esc(s) {
   return String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 }
 
-// Nav loading feedback
 document.querySelectorAll(".nav-item").forEach(btn => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("is-loading"));
@@ -411,7 +512,6 @@ document.querySelectorAll(".nav-item").forEach(btn => {
   });
 });
 
-// Boot
 if (location.hash === "#register") showAuthTab("register");
 if (getToken()) initApp().catch(() => logout());
 else showAuthTab(location.hash === "#register" ? "register" : "login");

@@ -115,8 +115,7 @@ async function api(path, opts = {}, retries = 0) {
 function toast(msg, isError = false) {
   document.querySelectorAll(".toast").forEach(t => t.remove());
   const el = document.createElement("div");
-  el.className = "toast";
-  el.style.borderColor = isError ? "var(--danger)" : "var(--accent2)";
+  el.className = "toast" + (isError ? " is-error" : "");
   el.textContent = msg;
   document.body.appendChild(el);
   setTimeout(() => {
